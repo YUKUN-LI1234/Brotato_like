@@ -1,4 +1,5 @@
 import type { Enemy, WeaponSlot } from '../game/types';
+import { tierOf, weaponStats } from '../data/weapons';
 import type { World } from '../game/world';
 
 export interface ShotSpec {
@@ -23,7 +24,8 @@ export function updateWeapons(w: World, dt: number): void {
   for (const slot of p.weapons) {
     const wx = p.x + slot.ox;
     const wy = p.y + slot.oy;
-    const range = Math.max(50, slot.def.range + p.stats.range);
+    const ws = weaponStats(slot.def, slot.tier);
+    const range = Math.max(50, ws.range + p.stats.range);
     if (slot.cooldown > 0) slot.cooldown -= dt;
 
     const target = nearestEnemy(w, wx, wy, range);
@@ -31,7 +33,7 @@ export function updateWeapons(w: World, dt: number): void {
     slot.angle = Math.atan2(target.y - wy, target.x - wx);
 
     if (slot.cooldown <= 0) {
-      slot.cooldown = slot.def.cooldown / attackSpeed;
+      slot.cooldown = ws.cooldown / attackSpeed;
       fireWeapon(w, slot, wx, wy, range);
     }
   }
@@ -39,7 +41,9 @@ export function updateWeapons(w: World, dt: number): void {
 
 function fireWeapon(w: World, slot: WeaponSlot, x: number, y: number, range: number): void {
   const def = slot.def;
+  const ws = weaponStats(def, slot.tier);
   const s = w.player.stats;
+  const tierColor = slot.tier > 1 ? tierOf(slot.tier).color : 0xfff4c2;
   const n = def.projectiles;
   w.events.push({ type: 'fire', weapon: def.id });
   // Start the shot at the muzzle, not the grip
@@ -49,8 +53,8 @@ function fireWeapon(w: World, slot: WeaponSlot, x: number, y: number, range: num
   for (let i = 0; i < n; i++) {
     const offset =
       n > 1 ? -def.spread / 2 + (def.spread * i) / (n - 1) : w.rng.range(-def.spread / 2, def.spread / 2);
-    const crit = w.rng.next() * 100 < s.critChance;
-    const base = def.damage * Math.max(0.1, 1 + s.damage / 100);
+    const crit = w.rng.next() * 100 < s.critChance + ws.critBonus;
+    const base = ws.damage * Math.max(0.1, 1 + s.damage / 100);
     fireProjectile(w, {
       x: mx,
       y: my,
@@ -59,10 +63,10 @@ function fireWeapon(w: World, slot: WeaponSlot, x: number, y: number, range: num
       life: range / def.projectileSpeed,
       damage: Math.max(1, Math.round(base * (crit ? def.critMult : 1))),
       pierce: def.pierce,
-      knockback: def.knockback,
+      knockback: ws.knockback,
       crit,
       hostile: false,
-      color: crit ? 0xffd84a : 0xfff4c2,
+      color: crit ? 0xffd84a : tierColor,
       r: 6,
     });
   }

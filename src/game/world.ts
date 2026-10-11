@@ -2,7 +2,7 @@ import { Pool } from '../core/pool';
 import { Rng } from '../core/rng';
 import { SpatialHash } from '../core/spatialHash';
 import { BASE_STATS } from '../data/stats';
-import { STARTING_WEAPON, type WeaponDef } from '../data/weapons';
+import { MAX_TIER, MAX_WEAPONS, MERGE_COUNT, STARTING_WEAPON, type WeaponDef } from '../data/weapons';
 import type { Enemy, FloatText, GameEvent, Pickup, Player, Projectile, SpawnMarker, WeaponSlot } from './types';
 
 export const ARENA_W = 1800;
@@ -86,10 +86,60 @@ export function createPlayer(): Player {
   return player;
 }
 
-export function addWeapon(player: Player, def: WeaponDef): void {
-  const slot: WeaponSlot = { def, cooldown: 0, angle: 0, ox: 0, oy: 0 };
-  player.weapons.push(slot);
+export interface MergeResult {
+  def: WeaponDef;
+  /** Tier of the newly created weapon. */
+  tier: number;
+}
+
+/** Add a weapon, then merge any trio of same kind + tier (chains allowed). */
+export function addWeapon(player: Player, def: WeaponDef, tier = 1): MergeResult[] {
+  player.weapons.push(makeSlot(def, tier));
+  const merges = mergeWeapons(player);
   layoutWeapons(player);
+  return merges;
+}
+
+export function mergeWeapons(player: Player): MergeResult[] {
+  const results: MergeResult[] = [];
+  for (;;) {
+    const group = findMergeGroup(player.weapons);
+    if (!group) return results;
+    const { def, tier } = group[0];
+    const used = new Set(group);
+    // The new weapon takes the place of the first merged one
+    const at = player.weapons.indexOf(group[0]);
+    player.weapons = player.weapons.filter((s) => !used.has(s));
+    player.weapons.splice(Math.min(at, player.weapons.length), 0, makeSlot(def, tier + 1));
+    results.push({ def, tier: tier + 1 });
+  }
+}
+
+function findMergeGroup(slots: readonly WeaponSlot[]): WeaponSlot[] | null {
+  for (const slot of slots) {
+    if (slot.tier >= MAX_TIER) continue;
+    const same = slots.filter((s) => s.def.id === slot.def.id && s.tier === slot.tier);
+    if (same.length >= MERGE_COUNT) return same.slice(0, MERGE_COUNT);
+  }
+  return null;
+}
+
+/** A weapon fits if there is a free slot, or if it would complete a merge. */
+export function canAcquire(player: Player, def: WeaponDef, tier: number): boolean {
+  if (player.weapons.length < MAX_WEAPONS) return true;
+  if (tier >= MAX_TIER) return false;
+  const same = player.weapons.filter((s) => s.def.id === def.id && s.tier === tier).length;
+  return same >= MERGE_COUNT - 1;
+}
+
+/** How many more copies of this weapon/tier would trigger a merge (0 = not close). */
+export function mergeProgress(player: Player, def: WeaponDef, tier: number): number {
+  if (tier >= MAX_TIER) return 0;
+  return player.weapons.filter((s) => s.def.id === def.id && s.tier === tier).length;
+}
+
+function makeSlot(def: WeaponDef, tier: number): WeaponSlot {
+  return { def, tier, cooldown: 0, angle: 0, ox: 0, oy: 0 };
 }
 
 /** Spread weapons evenly on a ring around the player. */

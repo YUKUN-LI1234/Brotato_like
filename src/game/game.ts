@@ -7,7 +7,7 @@ import { ITEMS } from '../data/items';
 import { addStats, formatStatMod, STAT_ORDER } from '../data/stats';
 import { UPGRADES, type Upgrade } from '../data/upgrades';
 import { MAX_WAVE, priceForWave, rerollCost, waveConfig } from '../data/waves';
-import { MAX_WEAPONS, WEAPONS } from '../data/weapons';
+import { MAX_TIER, MERGE_COUNT, rollShopTier, tierOf, weaponStats, WEAPONS, type WeaponDef } from '../data/weapons';
 import { GameRenderer } from '../render/renderer';
 import { cleanup, clearWave } from '../systems/cleanup';
 import { collectMaterial, gainXp } from '../systems/combat';
@@ -21,7 +21,7 @@ import { Hud } from '../ui/hud';
 import { Screens, type ShopOffer } from '../ui/screens';
 import { ENEMIES } from '../data/enemies';
 import type { GameEvent } from './types';
-import { addWeapon, ARENA_H, ARENA_W, maxHpOf, World } from './world';
+import { addWeapon, ARENA_H, ARENA_W, canAcquire, maxHpOf, mergeProgress, World, type MergeResult } from './world';
 
 export type GameState = 'menu' | 'wave' | 'levelup' | 'shop' | 'gameover';
 
@@ -47,6 +47,7 @@ export class Game {
   private readonly loop: FixedLoop;
   private offers: ShopOffer[] = [];
   private rerolls = 0;
+  private notices: string[] = [];
 
   constructor(app: Application, uiRoot: HTMLElement) {
     this.world = new World(1);
@@ -160,6 +161,7 @@ export class Game {
       return;
     }
     this.rerolls = 0;
+    this.notices = [];
     this.offers = this.rollOffers();
     this.openShop();
   }
@@ -177,19 +179,8 @@ export class Game {
     for (let i = 0; i < 4; i++) {
       if (w.rng.chance(0.35)) {
         const def = w.rng.pick(Object.values(WEAPONS));
-        offers.push({
-          kind: 'weapon',
-          id: def.id,
-          name: def.name,
-          price: priceForWave(def.price, w.wave),
-          lines: [
-            `Damage ${def.damage}${def.projectiles > 1 ? ` x${def.projectiles}` : ''}`,
-            `Cooldown ${def.cooldown}s`,
-            `Range ${def.range}`,
-          ],
-          color: def.color,
-          sold: false,
-        });
+        const tier = rollShopTier(w.rng.next(), w.wave);
+        offers.push(this.weaponOffer(def, tier));
       } else {
         const item = w.rng.pick(ITEMS);
         offers.push({
@@ -197,16 +188,59 @@ export class Game {
           id: item.id,
           name: item.name,
           price: priceForWave(item.price, w.wave),
+          tier: 0,
           lines: STAT_ORDER.filter((k) => item.mods[k]).map((k) => formatStatMod(k, item.mods[k]!)),
           color: item.color,
           sold: false,
+          fits: true,
+          mergeHint: null,
         });
       }
     }
     return offers;
   }
 
+  private weaponOffer(def: WeaponDef, tier: number): ShopOffer {
+    const ws = weaponStats(def, tier);
+    const lines = [
+      `伤害 ${ws.damage}${def.projectiles > 1 ? ` ×${def.projectiles}` : ''}`,
+      `冷却 ${ws.cooldown} 秒`,
+      `射程 ${ws.range}`,
+    ];
+    if (ws.critBonus > 0) lines.push(`暴击率 +${ws.critBonus}%`);
+    return {
+      kind: 'weapon',
+      id: def.id,
+      name: def.name,
+      tier,
+      price: priceForWave(def.price * tierOf(tier).price, this.world.wave),
+      lines,
+      color: def.color,
+      sold: false,
+      fits: true,
+      mergeHint: null,
+    };
+  }
+
+  /** Recompute per-offer merge info against the current loadout. */
+  private refreshOffers(): void {
+    const p = this.world.player;
+    for (const o of this.offers) {
+      if (o.kind !== 'weapon') continue;
+      const def = WEAPONS[o.id];
+      o.fits = canAcquire(p, def, o.tier);
+      const owned = mergeProgress(p, def, o.tier);
+      o.mergeHint =
+        o.tier >= MAX_TIER || owned === 0
+          ? null
+          : owned >= MERGE_COUNT - 1
+            ? `购买后合成 → ${tierOf(o.tier + 1).name}`
+            : `已有 ${owned}/${MERGE_COUNT}`;
+    }
+  }
+
   private openShop(): void {
+    this.refreshOffers();
     const w = this.world;
     const p = w.player;
     this.state = 'shop';
@@ -216,13 +250,14 @@ export class Game {
         materials: p.materials,
         offers: this.offers,
         rerollCost: rerollCost(w.wave, this.rerolls),
-        weapons: p.weapons.map((s) => s.def.name),
-        weaponSlotsFull: p.weapons.length >= MAX_WEAPONS,
+        weapons: p.weapons.map((s) => ({ name: s.def.name, tier: s.tier })),
         stats: p.stats,
+        notices: this.notices,
       },
       (i) => this.buy(i),
       () => this.reroll(),
       () => {
+        this.notices = [];
         w.wave++;
         this.startWave();
       },
@@ -233,9 +268,11 @@ export class Game {
     const p = this.world.player;
     const offer = this.offers[i];
     if (!offer || offer.sold || offer.price > p.materials) return;
+    this.notices = [];
     if (offer.kind === 'weapon') {
-      if (p.weapons.length >= MAX_WEAPONS) return;
-      addWeapon(p, WEAPONS[offer.id]);
+      const def = WEAPONS[offer.id];
+      if (!canAcquire(p, def, offer.tier)) return;
+      this.announceMerges(addWeapon(p, def, offer.tier));
     } else {
       const item = ITEMS.find((it) => it.id === offer.id)!;
       addStats(p.stats, item.mods);
@@ -247,12 +284,20 @@ export class Game {
     this.openShop();
   }
 
+  private announceMerges(merges: MergeResult[]): void {
+    for (const m of merges) {
+      this.notices.push(`合成成功！${MERGE_COUNT} 把${tierOf(m.tier - 1).name}${m.def.name} → ${tierOf(m.tier).name}${m.def.name}`);
+      this.audio.play('hit_crit');
+    }
+  }
+
   private reroll(): void {
     const p = this.world.player;
     const cost = rerollCost(this.world.wave, this.rerolls);
     if (cost > p.materials) return;
     p.materials -= cost;
     this.rerolls++;
+    this.notices = [];
     this.offers = this.rollOffers();
     this.openShop();
   }
@@ -301,9 +346,10 @@ export class Game {
       this.world.player.materials += materials;
     },
     xp: (amount: number) => gainXp(this.world, amount),
-    weapon: (id: string) => {
+    weapon: (id: string, tier = 1) => {
       const def = WEAPONS[id];
-      if (def && this.world.player.weapons.length < MAX_WEAPONS) addWeapon(this.world.player, def);
+      if (def && canAcquire(this.world.player, def, tier)) return addWeapon(this.world.player, def, tier);
+      return [];
     },
     skipWave: () => {
       if (this.state === 'wave') this.world.waveTime = this.world.waveDuration;

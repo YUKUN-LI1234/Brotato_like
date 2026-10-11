@@ -22,7 +22,7 @@ export interface WeaponDef {
 export const WEAPONS: Record<string, WeaponDef> = {
   pistol: {
     id: 'pistol',
-    name: 'Pea Shooter',
+    name: '豌豆枪',
     price: 15,
     damage: 12,
     cooldown: 1.1,
@@ -38,7 +38,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
   },
   smg: {
     id: 'smg',
-    name: 'Rattler',
+    name: '冲锋枪',
     price: 25,
     damage: 4,
     cooldown: 0.18,
@@ -54,7 +54,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
   },
   shotgun: {
     id: 'shotgun',
-    name: 'Scattergun',
+    name: '霰弹枪',
     price: 30,
     damage: 5,
     cooldown: 1.3,
@@ -70,7 +70,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
   },
   rifle: {
     id: 'rifle',
-    name: 'Longshot',
+    name: '狙击枪',
     price: 35,
     damage: 30,
     cooldown: 1.6,
@@ -88,3 +88,63 @@ export const WEAPONS: Record<string, WeaponDef> = {
 
 export const STARTING_WEAPON = WEAPONS.pistol;
 export const MAX_WEAPONS = 6;
+
+/**
+ * Weapon tiers (quality). Three weapons of the same kind and tier merge into
+ * one of the next tier. Each tier scales the base stats in steps.
+ */
+export interface TierDef {
+  name: string;
+  color: number;
+  damage: number;
+  cooldown: number;
+  range: number;
+  knockback: number;
+  critBonus: number;
+  price: number;
+}
+
+export const TIERS: readonly TierDef[] = [
+  { name: '普通', color: 0xe8e8e8, damage: 1, cooldown: 1, range: 0, knockback: 1, critBonus: 0, price: 1 },
+  { name: '稀有', color: 0x4aa3ff, damage: 1.8, cooldown: 0.9, range: 25, knockback: 1.2, critBonus: 3, price: 2.2 },
+  { name: '史诗', color: 0xb26bff, damage: 3, cooldown: 0.8, range: 50, knockback: 1.4, critBonus: 6, price: 4.5 },
+  { name: '传说', color: 0xff4d4d, damage: 5, cooldown: 0.7, range: 100, knockback: 1.6, critBonus: 10, price: 9 },
+];
+
+export const MAX_TIER = TIERS.length;
+export const MERGE_COUNT = 3;
+
+export function tierOf(tier: number): TierDef {
+  return TIERS[Math.min(Math.max(tier, 1), MAX_TIER) - 1];
+}
+
+/** Final stats of a weapon at a given tier, before player stat modifiers. */
+export interface WeaponStats {
+  damage: number;
+  cooldown: number;
+  range: number;
+  knockback: number;
+  critBonus: number;
+}
+
+export function weaponStats(def: WeaponDef, tier: number): WeaponStats {
+  const t = tierOf(tier);
+  return {
+    damage: Math.round(def.damage * t.damage),
+    cooldown: Math.round(def.cooldown * t.cooldown * 100) / 100,
+    range: def.range + t.range,
+    knockback: def.knockback * t.knockback,
+    critBonus: t.critBonus,
+  };
+}
+
+/** Higher tiers start appearing in the shop as the run goes on. */
+export function rollShopTier(roll: number, wave: number): number {
+  const p4 = wave >= 10 ? Math.min(0.06, (wave - 9) * 0.01) : 0;
+  const p3 = wave >= 6 ? Math.min(0.15, (wave - 5) * 0.025) : 0;
+  const p2 = wave >= 3 ? Math.min(0.3, (wave - 2) * 0.04) : 0;
+  if (roll < p4) return 4;
+  if (roll < p4 + p3) return 3;
+  if (roll < p4 + p3 + p2) return 2;
+  return 1;
+}

@@ -17,6 +17,8 @@ export interface Body {
 
 export interface WeaponSlot {
   def: WeaponDef;
+  /** Quality 1..4 (white, blue, purple, red). */
+  tier: number;
   cooldown: number;
   /** Current aim angle in radians. */
   angle: number;

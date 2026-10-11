@@ -35,18 +35,18 @@ export const BASE_STATS: Readonly<Stats> = {
 };
 
 export const STAT_LABELS: Record<StatKey, string> = {
-  maxHp: 'Max HP',
-  hpRegen: 'HP Regen',
-  armor: 'Armor',
-  dodge: 'Dodge',
-  speed: 'Speed',
-  damage: 'Damage',
-  attackSpeed: 'Attack Speed',
-  critChance: 'Crit Chance',
-  range: 'Range',
-  harvesting: 'Harvesting',
-  pickupRange: 'Pickup Range',
-  luck: 'Luck',
+  maxHp: '最大生命',
+  hpRegen: '生命再生',
+  armor: '护甲',
+  dodge: '闪避',
+  speed: '移动速度',
+  damage: '伤害',
+  attackSpeed: '攻击速度',
+  critChance: '暴击率',
+  range: '射程',
+  harvesting: '收获',
+  pickupRange: '拾取范围',
+  luck: '幸运',
 };
 
 const PERCENT_STATS = new Set<StatKey>([
@@ -70,7 +70,7 @@ export function formatStatValue(key: StatKey, value: number): string {
 
 export function formatStatMod(key: StatKey, value: number): string {
   const sign = value > 0 ? '+' : '';
-  return `${sign}${formatStatValue(key, value)} ${STAT_LABELS[key]}`;
+  return `${STAT_LABELS[key]} ${sign}${formatStatValue(key, value)}`;
 }
 
 /** Damage multiplier from armor: 15 armor halves incoming damage. */

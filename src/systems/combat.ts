@@ -74,7 +74,7 @@ export function gainXp(w: World, amount: number): void {
     // Every level grants +1 max HP, like the genre staple
     p.stats.maxHp += 1;
     p.hp += 1;
-    addText(w, p.x, p.y - 40, 'LEVEL UP!', 0x7dff8a, 1.4);
+    addText(w, p.x, p.y - 40, '升级!', 0x7dff8a, 1.4);
   }
 }
 
@@ -82,7 +82,7 @@ export function damagePlayer(w: World, raw: number): void {
   const p = w.player;
   if (p.iframes > 0 || w.god) return;
   if (w.rng.next() * 100 < Math.min(p.stats.dodge, MAX_DODGE)) {
-    addText(w, p.x, p.y - 30, 'Dodge', 0x9ad0ff);
+    addText(w, p.x, p.y - 30, '闪避', 0x9ad0ff);
     p.iframes = 0.2;
     return;
   }

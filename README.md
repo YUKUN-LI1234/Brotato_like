@@ -20,6 +20,9 @@ Controls: **WASD / arrow keys** to move, **1–4** to pick a level-up, **Enter**
 - 20 waves with a rising difficulty curve; telegraphed spawns
 - 4 enemy types (chaser, fast runner, tank, ranged spitter)
 - 4 weapons with auto-aim, crits, pierce, spread and knockback; up to 6 at once
+- Weapon tiers: Common (white) → Rare (blue) → Epic (purple) → Legendary (red). Three of the same weapon and tier merge into one of the next tier automatically (chain merges included); each tier steps up damage, fire rate, range, knockback and crit. Higher tiers show up in the shop in later waves
+- Chinese UI (简体中文)
+- Procedural music and sound effects (Web Audio, no audio files)
 - 12 stats (HP, regen, armor, dodge, damage, attack speed, crit, range, harvesting, …)
 - XP and level-ups, materials, shop with items, weapons and rerolls
 - Best wave saved in `localStorage`
@@ -55,16 +58,18 @@ The game instance is exposed as `__game` in the browser console:
 __game.debug.spawn(200)          // spawn enemies ('blob' | 'runner' | 'brute' | 'spitter')
 __game.debug.god()               // invincible
 __game.debug.give(100)           // materials
-__game.debug.weapon('shotgun')   // 'pistol' | 'smg' | 'shotgun' | 'rifle'
+__game.debug.weapon('shotgun', 2) // id: 'pistol' | 'smg' | 'shotgun' | 'rifle', tier 1-4
 __game.debug.skipWave()
 ```
 
 ## Roadmap
 
-- [ ] Melee weapons and weapon tiers/merging
+- [x] Weapon tiers and merging
+- [ ] Melee weapons
 - [ ] Characters with starting bonuses
 - [ ] Elite and boss waves
-- [ ] Sound effects (jsfxr) and music
+- [x] Sound effects and music
+- [ ] English/Chinese language switch
 - [ ] Touch controls (virtual joystick)
 - [ ] Unit tests for systems with Vitest
 

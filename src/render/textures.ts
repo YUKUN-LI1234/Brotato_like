@@ -1,6 +1,6 @@
 import { Graphics, type Renderer, type Texture } from 'pixi.js';
 import { ENEMIES } from '../data/enemies';
-import { WEAPONS } from '../data/weapons';
+import { TIERS, WEAPONS } from '../data/weapons';
 
 /**
  * All art is drawn procedurally with Graphics and baked into textures once,
@@ -9,7 +9,10 @@ import { WEAPONS } from '../data/weapons';
 export interface TextureSet {
   player: Texture;
   enemies: Record<string, Texture>;
+  /** Keyed by `${weaponId}_${tier}`. */
   weapons: Record<string, Texture>;
+  /** Normalized anchor that puts the grip (local origin) at the sprite position. */
+  weaponAnchors: Record<string, { x: number; y: number }>;
   bullet: Texture;
   material: Texture;
   marker: Texture;
@@ -28,12 +31,22 @@ export function buildTextures(renderer: Renderer): TextureSet {
   for (const def of ENEMIES) enemies[def.id] = bake(drawEnemy(def.radius, def.color, def.behavior === 'ranged'));
 
   const weapons: Record<string, Texture> = {};
-  for (const def of Object.values(WEAPONS)) weapons[def.id] = bake(drawWeapon(def.length, def.color));
+  const weaponAnchors: Record<string, { x: number; y: number }> = {};
+  for (const def of Object.values(WEAPONS)) {
+    TIERS.forEach((tier, i) => {
+      const key = weaponKey(def.id, i + 1);
+      const g = drawWeapon(def.length, def.color, tier.color, i + 1);
+      const b = g.getLocalBounds();
+      weaponAnchors[key] = { x: -b.x / b.width, y: -b.y / b.height };
+      weapons[key] = bake(g);
+    });
+  }
 
   return {
     player: bake(drawPotato()),
     enemies,
     weapons,
+    weaponAnchors,
     bullet: bake(new Graphics().circle(0, 0, 8).fill(0xffffff)),
     material: bake(
       new Graphics()
@@ -91,11 +104,20 @@ function drawEnemy(r: number, color: number, ranged: boolean): Graphics {
   return g;
 }
 
-function drawWeapon(length: number, color: number): Graphics {
+export function weaponKey(id: string, tier: number): string {
+  return `${id}_${tier}`;
+}
+
+/** The outline uses the tier color; higher tiers also get a soft glow. */
+function drawWeapon(length: number, color: number, tierColor: number, tier: number): Graphics {
   const g = new Graphics();
+  if (tier >= 2) {
+    const glow = 4 + tier * 2;
+    g.roundRect(-6 - glow, -6 - glow, length + glow * 2, 10 + glow * 2, 8).fill({ color: tierColor, alpha: 0.12 + tier * 0.04 });
+  }
   // Grip at the origin, barrel pointing to +x
-  g.roundRect(-4, -2, 10, 12, 3).fill(shade(color, 0.6)).stroke({ width: 2, color: OUTLINE });
-  g.roundRect(-6, -6, length, 10, 3).fill(color).stroke({ width: 2, color: OUTLINE });
+  g.roundRect(-4, -2, 10, 12, 3).fill(shade(color, 0.6)).stroke({ width: 3, color: tierColor });
+  g.roundRect(-6, -6, length, 10, 3).fill(color).stroke({ width: 3, color: tierColor });
   g.rect(length - 10, -4, 4, 6).fill(shade(color, 1.3));
   return g;
 }

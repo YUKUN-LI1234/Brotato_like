@@ -1,7 +1,7 @@
 import { BitmapText, Container, Graphics, Sprite, type Application } from 'pixi.js';
 import type { Body } from '../game/types';
 import { ARENA_H, ARENA_W, type World } from '../game/world';
-import { buildTextures, type TextureSet } from './textures';
+import { buildTextures, weaponKey, type TextureSet } from './textures';
 
 /** World units visible across the shorter screen axis. */
 const VIEW_HEIGHT = 820;
@@ -60,8 +60,10 @@ export class GameRenderer {
     ps.alpha = p.iframes > 0 && Math.floor(t * 20) % 2 === 0 ? 0.4 : 1;
 
     this.sync(this.layers.player, p.weapons, (s, slot) => {
-      s.texture = this.tex.weapons[slot.def.id];
-      s.anchor.set(0.15, 0.5);
+      const key = weaponKey(slot.def.id, slot.tier);
+      const anchor = this.tex.weaponAnchors[key];
+      s.texture = this.tex.weapons[key];
+      s.anchor.set(anchor.x, anchor.y);
       s.position.set(pp.x + slot.ox, pp.y + slot.oy);
       s.rotation = slot.angle;
       // Keep guns upright when aiming left
@@ -136,7 +138,7 @@ export class GameRenderer {
       const bt = new BitmapText({
         text: '',
         style: {
-          fontFamily: 'Arial Black, Arial, sans-serif',
+          fontFamily: 'Arial Black, "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif',
           fontSize: 26,
           fontWeight: 'bold',
           fill: 0xffffff,

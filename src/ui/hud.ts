@@ -26,7 +26,7 @@ export class Hud {
         <div class="wave"></div>
         <div class="timer"></div>
       </div>
-      <button class="mute" title="Mute (M)"></button>`;
+      <button class="mute" title="静音 (M)"></button>`;
     parent.appendChild(this.root);
     const q = (s: string) => this.root.querySelector(s) as HTMLElement;
     this.hpFill = q('.hp .fill');
@@ -47,7 +47,7 @@ export class Hud {
   }
 
   setMuted(muted: boolean): void {
-    this.muteBtn.textContent = muted ? 'Sound: off (M)' : 'Sound: on (M)';
+    this.muteBtn.textContent = muted ? '声音：关 (M)' : '声音：开 (M)';
     this.muteBtn.classList.toggle('off', muted);
   }
 
@@ -62,10 +62,10 @@ export class Hud {
     const remaining = Math.max(0, Math.ceil(w.waveDuration - w.waveTime));
     this.set(this.hpText, `${Math.ceil(p.hp)} / ${max}`);
     this.setWidth(this.hpFill, p.hp / max);
-    this.set(this.xpText, `LV ${p.level}`);
+    this.set(this.xpText, `等级 ${p.level}`);
     this.setWidth(this.xpFill, p.xp / need);
     this.set(this.materials, String(p.materials));
-    this.set(this.wave, `WAVE ${w.wave}`);
+    this.set(this.wave, `第 ${w.wave} 波`);
     this.set(this.timer, String(remaining));
     this.timer.classList.toggle('urgent', remaining <= 5);
   }
