@@ -1,0 +1,21 @@
+{
+  "name": "brotato-like",
+  "version": "1.0.0",
+  "description": "A Brotato-inspired arena shooter built from scratch with TypeScript and Pixi.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  },
+  "private": true,
+  "type": "module"
+}

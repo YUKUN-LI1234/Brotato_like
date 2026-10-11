@@ -1,0 +1,94 @@
+import type { EnemyDef } from '../data/enemies';
+import type { Stats } from '../data/stats';
+import type { WeaponDef } from '../data/weapons';
+
+/**
+ * Anything with a position and a collision circle.
+ * `px/py` hold the position at the previous simulation step so the renderer
+ * can interpolate between steps.
+ */
+export interface Body {
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+  r: number;
+}
+
+export interface WeaponSlot {
+  def: WeaponDef;
+  cooldown: number;
+  /** Current aim angle in radians. */
+  angle: number;
+  /** Offset from the player center. */
+  ox: number;
+  oy: number;
+}
+
+export interface Player extends Body {
+  hp: number;
+  stats: Stats;
+  weapons: WeaponSlot[];
+  items: string[];
+  level: number;
+  xp: number;
+  /** Level-ups earned this wave, resolved at wave end. */
+  pendingLevels: number;
+  materials: number;
+  iframes: number;
+  regenTimer: number;
+  facing: 1 | -1;
+  moving: boolean;
+}
+
+export interface Enemy extends Body {
+  def: EnemyDef;
+  hp: number;
+  maxHp: number;
+  speed: number;
+  damage: number;
+  /** Knockback velocity, decays every step. */
+  kbx: number;
+  kby: number;
+  flash: number;
+  attackTimer: number;
+  dead: boolean;
+}
+
+export interface Projectile extends Body {
+  vx: number;
+  vy: number;
+  life: number;
+  damage: number;
+  pierce: number;
+  knockback: number;
+  crit: boolean;
+  /** Fired by an enemy (hits the player) instead of by the player. */
+  hostile: boolean;
+  color: number;
+  /** Enemies already hit, so a piercing shot never hits the same one twice. */
+  hits: Enemy[];
+}
+
+export interface Pickup extends Body {
+  value: number;
+  magnet: boolean;
+  speed: number;
+}
+
+/** Telegraphs where an enemy is about to appear. */
+export interface SpawnMarker {
+  x: number;
+  y: number;
+  t: number;
+  def: EnemyDef;
+}
+
+export interface FloatText {
+  x: number;
+  y: number;
+  text: string;
+  color: number;
+  t: number;
+  scale: number;
+}

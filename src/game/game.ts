@@ -1,0 +1,268 @@
+import type { Application } from 'pixi.js';
+import { Input } from '../core/input';
+import { FixedLoop } from '../core/loop';
+import { ITEMS } from '../data/items';
+import { addStats, formatStatMod, STAT_ORDER } from '../data/stats';
+import { UPGRADES, type Upgrade } from '../data/upgrades';
+import { MAX_WAVE, priceForWave, rerollCost, waveConfig } from '../data/waves';
+import { MAX_WEAPONS, WEAPONS } from '../data/weapons';
+import { GameRenderer } from '../render/renderer';
+import { cleanup, clearWave } from '../systems/cleanup';
+import { collectMaterial, gainXp } from '../systems/combat';
+import { updateEnemies } from '../systems/enemies';
+import { collectAllPickups, updatePickups } from '../systems/pickups';
+import { updatePlayer } from '../systems/player';
+import { updateProjectiles } from '../systems/projectiles';
+import { spawnEnemy, updateSpawns } from '../systems/spawn';
+import { updateWeapons } from '../systems/weapons';
+import { Hud } from '../ui/hud';
+import { Screens, type ShopOffer } from '../ui/screens';
+import { ENEMIES } from '../data/enemies';
+import { addWeapon, ARENA_H, ARENA_W, maxHpOf, World } from './world';
+
+export type GameState = 'menu' | 'wave' | 'levelup' | 'shop' | 'gameover';
+
+const STEP = 1 / 60;
+const BEST_KEY = 'brotato_like.bestWave';
+
+/** Owns the loop and moves between states: menu → wave → level-up → shop → wave … */
+export class Game {
+  state: GameState = 'menu';
+  world: World;
+  private readonly input = new Input();
+  private readonly renderer: GameRenderer;
+  private readonly hud: Hud;
+  private readonly screens: Screens;
+  private readonly loop: FixedLoop;
+  private offers: ShopOffer[] = [];
+  private rerolls = 0;
+
+  constructor(app: Application, uiRoot: HTMLElement) {
+    this.world = new World(1);
+    this.renderer = new GameRenderer(app);
+    this.hud = new Hud(uiRoot);
+    this.screens = new Screens(uiRoot);
+    this.loop = new FixedLoop(STEP, (dt) => this.update(dt), (a) => this.render(a));
+    this.showMenu();
+    this.loop.start();
+  }
+
+  newRun(seed = Date.now() >>> 0): void {
+    this.world = new World(seed);
+    this.startWave();
+  }
+
+  private startWave(): void {
+    const w = this.world;
+    const p = w.player;
+    clearWave(w);
+    w.waveTime = 0;
+    w.waveDuration = waveConfig(w.wave).duration;
+    w.spawnTimer = 0.6;
+    w.playerDead = false;
+    p.x = p.px = ARENA_W / 2;
+    p.y = p.py = ARENA_H / 2;
+    p.hp = maxHpOf(p);
+    p.iframes = 0;
+    for (const slot of p.weapons) slot.cooldown = 0;
+    this.state = 'wave';
+    this.screens.hide();
+    this.hud.show(true);
+  }
+
+  private update(dt: number): void {
+    if (this.state !== 'wave') return;
+    const w = this.world;
+    w.snapshot();
+    w.time += dt;
+    w.waveTime += dt;
+
+    updatePlayer(w, this.input, dt);
+    updateSpawns(w, dt);
+    updateEnemies(w, dt);
+    updateWeapons(w, dt);
+    updateProjectiles(w, dt);
+    updatePickups(w, dt);
+    cleanup(w, dt);
+
+    if (w.playerDead) this.endRun(false);
+    else if (w.waveTime >= w.waveDuration) this.endWave();
+  }
+
+  private render(alpha: number): void {
+    this.renderer.render(this.world, this.state === 'wave' ? alpha : 1);
+    if (this.state !== 'menu') this.hud.update(this.world);
+  }
+
+  private endWave(): void {
+    const w = this.world;
+    const p = w.player;
+    collectAllPickups(w);
+    // Harvesting pays out materials and XP at the end of every wave
+    if (p.stats.harvesting > 0) collectMaterial(w, p.stats.harvesting);
+    clearWave(w);
+    this.saveBest(w.wave);
+
+    if (w.wave >= MAX_WAVE) {
+      this.endRun(true);
+      return;
+    }
+    this.nextAfterWave();
+  }
+
+  /** Spend pending level-ups one at a time, then open the shop. */
+  private nextAfterWave(): void {
+    const p = this.world.player;
+    if (p.pendingLevels > 0) {
+      this.state = 'levelup';
+      const options = this.world.rng.shuffled(UPGRADES).slice(0, 4);
+      const levelShown = p.level - p.pendingLevels + 1;
+      this.screens.levelUp(levelShown, p.pendingLevels, options, (u) => this.pickUpgrade(u));
+      return;
+    }
+    this.rerolls = 0;
+    this.offers = this.rollOffers();
+    this.openShop();
+  }
+
+  private pickUpgrade(u: Upgrade): void {
+    const p = this.world.player;
+    p.stats[u.stat] += u.amount;
+    p.pendingLevels--;
+    this.nextAfterWave();
+  }
+
+  private rollOffers(): ShopOffer[] {
+    const w = this.world;
+    const offers: ShopOffer[] = [];
+    for (let i = 0; i < 4; i++) {
+      if (w.rng.chance(0.35)) {
+        const def = w.rng.pick(Object.values(WEAPONS));
+        offers.push({
+          kind: 'weapon',
+          id: def.id,
+          name: def.name,
+          price: priceForWave(def.price, w.wave),
+          lines: [
+            `Damage ${def.damage}${def.projectiles > 1 ? ` x${def.projectiles}` : ''}`,
+            `Cooldown ${def.cooldown}s`,
+            `Range ${def.range}`,
+          ],
+          color: def.color,
+          sold: false,
+        });
+      } else {
+        const item = w.rng.pick(ITEMS);
+        offers.push({
+          kind: 'item',
+          id: item.id,
+          name: item.name,
+          price: priceForWave(item.price, w.wave),
+          lines: STAT_ORDER.filter((k) => item.mods[k]).map((k) => formatStatMod(k, item.mods[k]!)),
+          color: item.color,
+          sold: false,
+        });
+      }
+    }
+    return offers;
+  }
+
+  private openShop(): void {
+    const w = this.world;
+    const p = w.player;
+    this.state = 'shop';
+    this.screens.shop(
+      {
+        wave: w.wave,
+        materials: p.materials,
+        offers: this.offers,
+        rerollCost: rerollCost(w.wave, this.rerolls),
+        weapons: p.weapons.map((s) => s.def.name),
+        weaponSlotsFull: p.weapons.length >= MAX_WEAPONS,
+        stats: p.stats,
+      },
+      (i) => this.buy(i),
+      () => this.reroll(),
+      () => {
+        w.wave++;
+        this.startWave();
+      },
+    );
+  }
+
+  private buy(i: number): void {
+    const p = this.world.player;
+    const offer = this.offers[i];
+    if (!offer || offer.sold || offer.price > p.materials) return;
+    if (offer.kind === 'weapon') {
+      if (p.weapons.length >= MAX_WEAPONS) return;
+      addWeapon(p, WEAPONS[offer.id]);
+    } else {
+      const item = ITEMS.find((it) => it.id === offer.id)!;
+      addStats(p.stats, item.mods);
+      p.items.push(item.id);
+      p.hp = Math.min(p.hp, maxHpOf(p));
+    }
+    p.materials -= offer.price;
+    offer.sold = true;
+    this.openShop();
+  }
+
+  private reroll(): void {
+    const p = this.world.player;
+    const cost = rerollCost(this.world.wave, this.rerolls);
+    if (cost > p.materials) return;
+    p.materials -= cost;
+    this.rerolls++;
+    this.offers = this.rollOffers();
+    this.openShop();
+  }
+
+  private endRun(won: boolean): void {
+    this.state = 'gameover';
+    this.saveBest(won ? MAX_WAVE : this.world.wave - 1);
+    this.screens.gameOver(won, this.world.wave, this.world.kills, () => this.newRun());
+  }
+
+  private showMenu(): void {
+    this.state = 'menu';
+    this.hud.show(false);
+    this.screens.menu(this.loadBest(), () => this.newRun());
+  }
+
+  // localStorage can throw in private mode or sandboxed frames; best score is optional
+  private loadBest(): number {
+    try {
+      return Number(localStorage.getItem(BEST_KEY)) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private saveBest(wave: number): void {
+    try {
+      if (wave > this.loadBest()) localStorage.setItem(BEST_KEY, String(wave));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Hooks for the browser console and automated tests. */
+  readonly debug = {
+    spawn: (count: number, id = 'blob') => {
+      const def = ENEMIES.find((e) => e.id === id) ?? ENEMIES[0];
+      const w = this.world;
+      for (let i = 0; i < count; i++) spawnEnemy(w, def, w.rng.range(50, ARENA_W - 50), w.rng.range(50, ARENA_H - 50));
+    },
+    god: (on = true) => {
+      this.world.god = on;
+    },
+    give: (materials: number) => {
+      this.world.player.materials += materials;
+    },
+    xp: (amount: number) => gainXp(this.world, amount),
+    skipWave: () => {
+      if (this.state === 'wave') this.world.waveTime = this.world.waveDuration;
+    },
+  };
+}
