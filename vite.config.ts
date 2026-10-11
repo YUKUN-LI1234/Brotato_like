@@ -4,4 +4,6 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
   server: { port: 5173 },
+  // Inline (empty) PostCSS config so Vite doesn't pick up one from a parent folder
+  css: { postcss: {} },
 });

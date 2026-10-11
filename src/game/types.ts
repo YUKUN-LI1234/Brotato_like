@@ -25,6 +25,17 @@ export interface WeaponSlot {
   /** Offset from the player center. */
   ox: number;
   oy: number;
+  /** Melee: seconds left in the current attack animation (0 = idle). */
+  swing: number;
+  /** Melee: aim angle locked when the attack started. */
+  swingAngle: number;
+  /** Melee: reach of the current attack. */
+  swingReach: number;
+  /** Melee: damage and crit rolled when the attack started. */
+  swingDamage: number;
+  swingCrit: boolean;
+  /** Melee: enemies already hit by the current attack. */
+  swingHits: Enemy[];
 }
 
 export interface Player extends Body {
@@ -54,6 +65,14 @@ export interface Enemy extends Body {
   kby: number;
   flash: number;
   attackTimer: number;
+  /** Boss only: what it is doing right now. */
+  mode: 'move' | 'windup' | 'dash';
+  modeTimer: number;
+  /** Boss only: locked charge direction. */
+  dirX: number;
+  dirY: number;
+  /** Boss only: counts attacks so they alternate. */
+  attacks: number;
   dead: boolean;
 }
 
@@ -97,18 +116,6 @@ export interface Explosion {
   life: number;
 }
 
-/** A blast waiting to go off (aftershocks from "explode chance"). */
-export interface PendingBlast {
-  x: number;
-  y: number;
-  /** Base radius/damage, before explosion stats. */
-  radius: number;
-  damage: number;
-  knockback: number;
-  crit: boolean;
-  delay: number;
-}
-
 export interface FloatText {
   x: number;
   y: number;
@@ -124,5 +131,5 @@ export interface FloatText {
  */
 export type GameEvent =
   | { type: 'fire'; weapon: string }
-  | { type: 'enemyHit'; crit: boolean; killed: boolean }
+  | { type: 'enemyHit'; crit: boolean; killed: boolean; weapon?: string }
   | { type: 'explosion' };

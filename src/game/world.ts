@@ -8,7 +8,6 @@ import type {
   Explosion,
   FloatText,
   GameEvent,
-  PendingBlast,
   Pickup,
   Player,
   Projectile,
@@ -33,7 +32,6 @@ export class World {
   markers: SpawnMarker[] = [];
   texts: FloatText[] = [];
   explosions: Explosion[] = [];
-  pendingBlasts: PendingBlast[] = [];
   /** Drained by Game after every step. */
   events: GameEvent[] = [];
 
@@ -46,6 +44,8 @@ export class World {
   waveTime = 0;
   waveDuration = 20;
   spawnTimer = 0;
+  /** The boss of this wave has already been queued. */
+  bossSpawned = false;
   time = 0;
   kills = 0;
   playerDead = false;
@@ -159,7 +159,7 @@ export function mergeProgress(player: Player, def: WeaponDef, tier: number): num
 }
 
 function makeSlot(def: WeaponDef, tier: number): WeaponSlot {
-  return { def, tier, cooldown: 0, angle: 0, ox: 0, oy: 0 };
+  return { def, tier, cooldown: 0, angle: 0, ox: 0, oy: 0, swing: 0, swingAngle: 0, swingReach: 0, swingDamage: 0, swingCrit: false, swingHits: [] };
 }
 
 /** Spread weapons evenly on a ring around the player. */
@@ -182,7 +182,8 @@ function createEnemy(): Enemy {
     x: 0, y: 0, px: 0, py: 0, r: 0,
     def: undefined as unknown as Enemy['def'],
     hp: 0, maxHp: 0, speed: 0, damage: 0,
-    kbx: 0, kby: 0, flash: 0, attackTimer: 0, dead: false,
+    kbx: 0, kby: 0, flash: 0, attackTimer: 0,
+    mode: 'move', modeTimer: 0, dirX: 0, dirY: 0, attacks: 0, dead: false,
   };
 }
 

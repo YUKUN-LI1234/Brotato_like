@@ -128,6 +128,33 @@ body {
   color: var(--bad);
 }
 
+.boss-bar {
+  position: absolute;
+  top: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 70vw);
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--display);
+  color: #ff5a5a;
+  text-shadow: 0 2px 0 #000;
+}
+
+.boss-bar.show {
+  display: flex;
+}
+
+.boss-bar .bar {
+  flex: 1;
+  height: 16px;
+}
+
+.boss-bar .fill {
+  background: #d93a4a;
+}
+
 /* ---------- Pause ---------- */
 .pause-btn {
   position: absolute;
@@ -426,6 +453,11 @@ h3 {
   border-radius: 4px;
   background: #ffffff1a;
   color: var(--muted);
+}
+
+.tag-chip.linked {
+  background: #ffd84a33;
+  color: #ffd84a;
 }
 
 .card-line {

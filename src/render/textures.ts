@@ -1,5 +1,5 @@
 import { Graphics, type Renderer, type Texture } from 'pixi.js';
-import { ENEMIES, type EnemyDef } from '../data/enemies';
+import { BOSS, ENEMIES, type EnemyDef } from '../data/enemies';
 import { TIERS, WEAPONS, type WeaponDef } from '../data/weapons';
 
 /**
@@ -57,7 +57,7 @@ export function buildTextures(renderer: Renderer): TextureSet {
   };
 
   const enemies: Record<string, Anchored> = {};
-  for (const def of ENEMIES) enemies[def.id] = bakeAnchored(drawEnemy(def));
+  for (const def of [...ENEMIES, BOSS]) enemies[def.id] = bakeAnchored(drawEnemy(def));
 
   const weapons: Record<string, Anchored> = {};
   for (const def of Object.values(WEAPONS)) {
@@ -129,6 +129,8 @@ function drawEnemy(def: EnemyDef): Graphics {
       return drawBrute(def.radius, def.color);
     case 'spitter':
       return drawSaucer(def.radius, def.color);
+    case 'boss':
+      return drawOverlord(def.radius, def.color);
     default:
       return drawJelly(def.radius, def.color);
   }
@@ -257,6 +259,51 @@ function drawBrute(r: number, color: number): Graphics {
   return g;
 }
 
+/** Boss: crowned alien overlord with tentacles and one huge eye. */
+function drawOverlord(r: number, color: number): Graphics {
+  const g = new Graphics();
+  const dark = shade(color, 0.55);
+  const light = shade(color, 1.3);
+  // Tentacles under the body
+  for (let i = 0; i < 5; i++) {
+    const x = (i - 2) * r * 0.38;
+    const curl = i % 2 === 0 ? 1 : -1;
+    g.moveTo(x - r * 0.12, r * 0.55)
+      .quadraticCurveTo(x + curl * r * 0.3, r * 1.0, x + curl * r * 0.1, r * 1.25)
+      .quadraticCurveTo(x - curl * r * 0.05, r * 1.0, x + r * 0.12, r * 0.55)
+      .closePath()
+      .fill(dark)
+      .stroke({ width: 3, color: OUTLINE, join: 'round' });
+  }
+  // Crown of spikes behind the head
+  const spikes = 7;
+  for (let i = 0; i < spikes; i++) {
+    const a = Math.PI * (1.15 + (0.7 * i) / (spikes - 1));
+    const tipR = r * (i % 2 === 0 ? 1.45 : 1.25);
+    g.poly([
+      Math.cos(a - 0.14) * r * 0.8, Math.sin(a - 0.14) * r * 0.8,
+      Math.cos(a) * tipR, Math.sin(a) * tipR,
+      Math.cos(a + 0.14) * r * 0.8, Math.sin(a + 0.14) * r * 0.8,
+    ])
+      .fill(0xffd84a)
+      .stroke({ width: 2.5, color: OUTLINE, join: 'round' });
+  }
+  // Body
+  g.ellipse(0, 0, r, r * 0.88).fill(color).stroke({ width: 4, color: OUTLINE });
+  g.ellipse(-r * 0.25, -r * 0.4, r * 0.45, r * 0.22).fill({ color: light, alpha: 0.6 });
+  // Spots
+  for (const [x, y, s] of [[-0.6, 0.2, 0.13], [-0.4, 0.5, 0.09], [0.55, 0.45, 0.1]]) {
+    g.circle(x * r, y * r, s * r).fill(dark);
+  }
+  // One huge eye with a slit pupil, plus a fanged grin
+  eye(g, r * 0.12, -r * 0.12, r * 0.38, 0xff3b3b, true);
+  g.moveTo(-r * 0.35, r * 0.4).quadraticCurveTo(r * 0.15, r * 0.7, r * 0.6, r * 0.35).stroke({ width: 4, color: OUTLINE, cap: 'round' });
+  for (const x of [-0.15, 0.2, 0.45]) {
+    g.poly([x * r - r * 0.06, r * 0.47, x * r, r * 0.62, x * r + r * 0.06, r * 0.47]).fill(0xffffff).stroke({ width: 1.5, color: OUTLINE });
+  }
+  return g;
+}
+
 /** Cyan flying saucer piloted by a little green alien. */
 function drawSaucer(r: number, color: number): Graphics {
   const g = new Graphics();
@@ -300,9 +347,37 @@ function drawWeapon(def: WeaponDef, tierColor: number, tier: number): Graphics {
   const { length, color } = def;
   const stroke = { width: 3, color: tierColor };
   if (tier >= 2) {
-    const glow = 4 + tier * 2;
-    g.roundRect(-8 - glow, -9 - glow, length + 4 + glow * 2, 18 + glow * 2, 9).fill({ color: tierColor, alpha: 0.12 + tier * 0.04 });
+    // Soft oval aura along the weapon: stacked faint ellipses, dense in the
+    // middle and fading out, so it never reads as a solid box
+    const cx = length / 2 - 4;
+    const rx = length / 2 + 4 + tier * 2;
+    const ry = 9 + tier * 2;
+    const steps = 6;
+    for (let i = 0; i < steps; i++) {
+      const f = 1 - i / steps;
+      g.ellipse(cx, 0, rx * f, ry * f).fill({ color: tierColor, alpha: 0.025 + tier * 0.01 });
+    }
   }
+  if (def.style === 'club') {
+    // Wooden club: thin handle widening into a knobbly head
+    g.roundRect(-6, -3, 16, 6, 3).fill(shade(color, 0.7)).stroke(stroke);
+    g.poly([8, -4, length - 8, -8, length, -5, length + 2, 0, length, 5, length - 8, 8, 8, 4])
+      .fill(color)
+      .stroke({ ...stroke, join: 'round' });
+    g.circle(length - 10, -3, 2).fill(shade(color, 0.6));
+    g.circle(length - 4, 3, 1.8).fill(shade(color, 0.6));
+    g.moveTo(14, -1).lineTo(length - 14, -2).stroke({ width: 1.5, color: shade(color, 1.3) });
+    return g;
+  }
+  if (def.style === 'knife') {
+    // Short knife: wrapped handle, guard, pointed blade
+    g.roundRect(-6, -3, 12, 6, 2).fill(0x4a3326).stroke(stroke);
+    g.rect(5, -6, 3, 12).fill(0x6b6f78).stroke({ width: 2, color: tierColor });
+    g.poly([8, -4, length - 4, -3, length + 4, 0, length - 4, 3, 8, 3]).fill(color).stroke({ ...stroke, join: 'round' });
+    g.moveTo(10, -1).lineTo(length - 2, -0.5).stroke({ width: 1.5, color: 0xffffff, alpha: 0.7 });
+    return g;
+  }
+
   // Grip at the origin, barrel pointing to +x
   g.roundRect(-4, -2, 10, 12, 3).fill(shade(color, 0.6)).stroke(stroke);
 

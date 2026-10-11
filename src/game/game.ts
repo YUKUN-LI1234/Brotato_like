@@ -3,10 +3,10 @@ import { AudioEngine } from '../audio/audio';
 import type { SfxName } from '../audio/sfx';
 import { Input } from '../core/input';
 import { FixedLoop } from '../core/loop';
-import { ITEMS } from '../data/items';
+import { CONNECT_LABELS, connectMultiplier, ITEMS, linkedConnects } from '../data/items';
 import { addStats, formatStatMod, STAT_ORDER } from '../data/stats';
-import { UPGRADES, type Upgrade } from '../data/upgrades';
-import { MAX_WAVE, priceForWave, rerollCost, waveConfig } from '../data/waves';
+import { rollUpgrades, type Upgrade } from '../data/upgrades';
+import { MAX_WAVE, priceForWave, rerollCost, shopPriceWeight, waveConfig } from '../data/waves';
 import {
   MAX_TIER,
   MERGE_COUNT,
@@ -19,7 +19,7 @@ import {
 } from '../data/weapons';
 import { GameRenderer } from '../render/renderer';
 import { cleanup, clearWave } from '../systems/cleanup';
-import { collectMaterial, gainXp, updateBlasts } from '../systems/combat';
+import { collectMaterial, gainXp } from '../systems/combat';
 import { updateEnemies } from '../systems/enemies';
 import { collectAllPickups, updatePickups } from '../systems/pickups';
 import { updatePlayer } from '../systems/player';
@@ -29,7 +29,7 @@ import { updateWeapons } from '../systems/weapons';
 import { Hud } from '../ui/hud';
 import { Screens, type ShopOffer } from '../ui/screens';
 import { VolumeControl } from '../ui/volume';
-import { ENEMIES } from '../data/enemies';
+import { BOSS, ENEMIES } from '../data/enemies';
 import type { GameEvent } from './types';
 import type { WeaponSlot } from './types';
 import { addWeapon, ARENA_H, ARENA_W, canAcquire, maxHpOf, mergeProgress, removeWeapon, World, type MergeResult } from './world';
@@ -37,9 +37,15 @@ import { addWeapon, ARENA_H, ARENA_W, canAcquire, maxHpOf, mergeProgress, remove
 export type GameState = 'menu' | 'wave' | 'paused' | 'levelup' | 'shop' | 'gameover';
 
 const STEP = 1 / 60;
+
+const WEAPON_LIST = Object.values(WEAPONS);
+const priceRange = (prices: number[]) => ({ min: Math.min(...prices), max: Math.max(...prices) });
+const WEAPON_PRICES = priceRange(WEAPON_LIST.map((d) => d.price));
+const ITEM_PRICES = priceRange(ITEMS.map((it) => it.price));
 const BEST_KEY = 'brotato_like.bestWave';
 
 const FIRE_SOUND: Record<string, SfxName> = {
+  knife: 'swing',
   pistol: 'fire_pistol',
   smg: 'fire_smg',
   shotgun: 'fire_shotgun',
@@ -99,6 +105,7 @@ export class Game {
     w.waveTime = 0;
     w.waveDuration = waveConfig(w.wave).duration;
     w.spawnTimer = 0.6;
+    w.bossSpawned = false;
     w.playerDead = false;
     p.x = p.px = ARENA_W / 2;
     p.y = p.py = ARENA_H / 2;
@@ -123,7 +130,6 @@ export class Game {
     updateEnemies(w, dt);
     updateWeapons(w, dt);
     updateProjectiles(w, dt);
-    updateBlasts(w, dt);
     updatePickups(w, dt);
     cleanup(w, dt);
     this.playEvents(w.events);
@@ -166,6 +172,9 @@ export class Game {
         if (name) this.audio.play(name);
       } else if (ev.type === 'explosion') {
         this.audio.play('explosion');
+      } else if (ev.weapon === 'club') {
+        this.audio.play('thud');
+        if (ev.killed) this.audio.play('kill');
       } else if (ev.killed) {
         this.audio.play('kill');
       } else {
@@ -203,10 +212,11 @@ export class Game {
   /** Spend pending level-ups one at a time, then open the shop. */
   private nextAfterWave(): void {
     this.audio.setMusic('calm');
-    const p = this.world.player;
+    const w = this.world;
+    const p = w.player;
     if (p.pendingLevels > 0) {
       this.state = 'levelup';
-      const options = this.world.rng.shuffled(UPGRADES).slice(0, 4);
+      const options = rollUpgrades(w.rng, w.wave, p.stats.luck, 4);
       const levelShown = p.level - p.pendingLevels + 1;
       this.screens.levelUp(levelShown, p.pendingLevels, options, (u) => this.pickUpgrade(u));
       return;
@@ -226,21 +236,29 @@ export class Game {
 
   private rollOffers(): ShopOffer[] {
     const w = this.world;
+    const owned = w.player.items;
     const offers: ShopOffer[] = [];
     for (let i = 0; i < 4; i++) {
       if (w.rng.chance(0.35)) {
-        const def = w.rng.pick(Object.values(WEAPONS));
+        const def = w.rng.weighted(WEAPON_LIST, (d) =>
+          shopPriceWeight(d.price, WEAPON_PRICES.min, WEAPON_PRICES.max, w.wave),
+        );
         const tier = rollShopTier(w.rng.next(), w.wave);
         offers.push(this.weaponOffer(def, tier));
       } else {
-        const item = w.rng.pick(ITEMS);
+        // Cheap items early, pricier ones later; owned connections nudge the odds
+        const item = w.rng.weighted(
+          ITEMS,
+          (it) => shopPriceWeight(it.price, ITEM_PRICES.min, ITEM_PRICES.max, w.wave) * connectMultiplier(it, owned),
+        );
+        const linked = linkedConnects(item, owned);
         offers.push({
           kind: 'item',
           id: item.id,
           name: item.name,
           price: priceForWave(item.price, w.wave),
           tier: 0,
-          tags: [],
+          tags: item.connects.map((c) => ({ label: CONNECT_LABELS[c], linked: linked.includes(c) })),
           lines: STAT_ORDER.filter((k) => item.mods[k]).map((k) => formatStatMod(k, item.mods[k]!)),
           color: item.color,
           sold: false,
@@ -258,7 +276,7 @@ export class Game {
     const lines = [
       `伤害 ${ws.damage}${def.projectiles > 1 ? ` ×${def.projectiles}` : ''}`,
       `冷却 ${ws.cooldown} 秒`,
-      `射程 ${ws.range}`,
+      `${def.melee ? '攻击范围' : '射程'} ${ws.range}`,
     ];
     if (def.explosionRadius) lines.push(`爆炸范围 ${def.explosionRadius}`);
     if (ws.critBonus > 0) lines.push(`暴击率 +${ws.critBonus}%`);
@@ -268,7 +286,7 @@ export class Game {
       name: def.name,
       tier,
       price: priceForWave(def.price * tierOf(tier).price, this.world.wave),
-      tags: def.tags.map((t) => TAG_LABELS[t]),
+      tags: def.tags.map((t) => ({ label: TAG_LABELS[t], linked: false })),
       lines,
       color: def.color,
       sold: false,
@@ -435,7 +453,7 @@ export class Game {
   /** Hooks for the browser console and automated tests. */
   readonly debug = {
     spawn: (count: number, id = 'blob') => {
-      const def = ENEMIES.find((e) => e.id === id) ?? ENEMIES[0];
+      const def = [...ENEMIES, BOSS].find((e) => e.id === id) ?? ENEMIES[0];
       const w = this.world;
       for (let i = 0; i < count; i++) spawnEnemy(w, def, w.rng.range(50, ARENA_W - 50), w.rng.range(50, ARENA_H - 50));
     },

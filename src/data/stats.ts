@@ -8,6 +8,11 @@ export interface Stats {
   armor: number;
   dodge: number;
   speed: number;
+  /** Flat damage added to melee weapons' base damage. */
+  meleeDamage: number;
+  /** Flat damage added to ranged (projectile and explosive) weapons' base damage. */
+  rangedDamage: number;
+  /** % multiplier on all weapon damage, applied after the flat bonuses. */
   damage: number;
   attackSpeed: number;
   critChance: number;
@@ -19,8 +24,6 @@ export interface Stats {
   explosionSize: number;
   /** Explosion damage, % */
   explosionDamage: number;
-  /** Chance for an explosive weapon's blast to set off an aftershock, % */
-  explodeChance: number;
 }
 
 export type StatKey = keyof Stats;
@@ -31,6 +34,8 @@ export const BASE_STATS: Readonly<Stats> = {
   armor: 0,
   dodge: 0,
   speed: 0,
+  meleeDamage: 0,
+  rangedDamage: 0,
   damage: 0,
   attackSpeed: 0,
   critChance: 0,
@@ -40,7 +45,6 @@ export const BASE_STATS: Readonly<Stats> = {
   luck: 0,
   explosionSize: 0,
   explosionDamage: 0,
-  explodeChance: 0,
 };
 
 export const STAT_LABELS: Record<StatKey, string> = {
@@ -49,6 +53,8 @@ export const STAT_LABELS: Record<StatKey, string> = {
   armor: '护甲',
   dodge: '闪避',
   speed: '移动速度',
+  meleeDamage: '近战伤害',
+  rangedDamage: '远程伤害',
   damage: '伤害',
   attackSpeed: '攻击速度',
   critChance: '暴击率',
@@ -58,7 +64,6 @@ export const STAT_LABELS: Record<StatKey, string> = {
   luck: '幸运',
   explosionSize: '爆炸范围',
   explosionDamage: '爆炸伤害',
-  explodeChance: '爆炸几率',
 };
 
 const PERCENT_STATS = new Set<StatKey>([
@@ -71,7 +76,6 @@ const PERCENT_STATS = new Set<StatKey>([
   'luck',
   'explosionSize',
   'explosionDamage',
-  'explodeChance',
 ]);
 
 export const STAT_ORDER = Object.keys(STAT_LABELS) as StatKey[];

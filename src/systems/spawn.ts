@@ -1,6 +1,7 @@
 import { swapRemove } from '../core/pool';
-import { ENEMIES, type EnemyDef } from '../data/enemies';
-import { MAX_ENEMIES, waveConfig } from '../data/waves';
+import { BOSS, ENEMIES, type EnemyDef } from '../data/enemies';
+import { BOSS_DELAY, BOSS_WAVE, enemyHpScale, MAX_ENEMIES, waveConfig } from '../data/waves';
+import { addText } from './combat';
 import { ARENA_H, ARENA_W, type World } from '../game/world';
 
 const MARKER_TIME = 0.9;
@@ -16,6 +17,11 @@ export function updateSpawns(w: World, dt: number): void {
       w.spawnTimer += cfg.spawnInterval;
       spawnGroup(w, cfg.groupSize);
     }
+  }
+
+  if (w.wave === BOSS_WAVE && !w.bossSpawned && w.waveTime >= BOSS_DELAY) {
+    w.bossSpawned = true;
+    spawnBoss(w);
   }
 
   for (let i = w.markers.length - 1; i >= 0; i--) {
@@ -42,6 +48,15 @@ function spawnGroup(w: World, size: number): void {
   }
 }
 
+/** Long warning marker on the far side of the arena, then the boss lands. */
+function spawnBoss(w: World): void {
+  const p = w.player;
+  const x = p.x < ARENA_W / 2 ? ARENA_W * 0.78 : ARENA_W * 0.22;
+  const y = p.y < ARENA_H / 2 ? ARENA_H * 0.72 : ARENA_H * 0.28;
+  w.markers.push({ x, y, t: 2, def: BOSS });
+  addText(w, p.x, p.y - 60, 'BOSS 来袭！', 0xff5a5a, 2);
+}
+
 function pickEnemy(w: World): EnemyDef {
   const unlocked = ENEMIES.filter((e) => e.firstWave <= w.wave);
   return w.rng.weighted(unlocked, (e) => e.weight);
@@ -65,13 +80,16 @@ export function spawnEnemy(w: World, def: EnemyDef, x: number, y: number): void 
   e.x = e.px = x;
   e.y = e.py = y;
   e.r = def.radius;
-  e.maxHp = e.hp = def.hp + def.hpPerWave * scale;
+  e.maxHp = e.hp = Math.round((def.hp + def.hpPerWave * scale) * enemyHpScale(w.wave));
   e.damage = def.damage + def.damagePerWave * scale;
   // Slight speed variance keeps crowds from moving in lockstep
   e.speed = def.speed * w.rng.range(0.9, 1.1);
   e.kbx = e.kby = 0;
   e.flash = 0;
   e.attackTimer = w.rng.range(1, 2.5);
+  e.mode = 'move';
+  e.modeTimer = 0;
+  e.attacks = 0;
   e.dead = false;
   w.enemies.push(e);
 }

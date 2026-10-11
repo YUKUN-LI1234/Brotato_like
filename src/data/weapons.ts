@@ -1,11 +1,12 @@
 /** Weapon definitions. Pure data: systems read these, nothing mutates them. */
 
 /** Weapon class tags. Some stats only apply to weapons with a given tag. */
-export type WeaponTag = 'projectile' | 'explosive';
+export type WeaponTag = 'projectile' | 'explosive' | 'melee';
 
 export const TAG_LABELS: Record<WeaponTag, string> = {
   projectile: '投射物',
   explosive: '爆炸物',
+  melee: '近战',
 };
 
 export interface WeaponDef {
@@ -26,16 +27,64 @@ export interface WeaponDef {
   critMult: number;
   color: number;
   length: number;
-  /** Drawing style of the gun sprite. */
-  style: 'gun' | 'tube' | 'gatling';
-  /** Projectile look. */
-  projectile: 'bullet' | 'rocket';
+  /** Drawing style of the weapon sprite. */
+  style: 'gun' | 'tube' | 'gatling' | 'club' | 'knife';
+  /** Projectile look; melee weapons fire nothing. */
+  projectile: 'bullet' | 'rocket' | 'none';
+  /**
+   * Melee only. `arc` is the hit cone in radians (wide = sweep, narrow =
+   * thrust); `swing` is the attack animation length in seconds. For melee,
+   * `range` is the reach from the weapon's grip.
+   */
+  melee?: { arc: number; swing: number };
   tags: readonly WeaponTag[];
   /** If set, the shot explodes on impact/at max range with this base radius. */
   explosionRadius?: number;
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
+  club: {
+    id: 'club',
+    name: '木棒',
+    price: 12,
+    damage: 12,
+    cooldown: 1.05,
+    range: 160,
+    projectileSpeed: 0,
+    pierce: 0,
+    knockback: 45,
+    spread: 0,
+    projectiles: 1,
+    critMult: 1.5,
+    color: 0x8a5a32,
+    length: 36,
+    style: 'club',
+    projectile: 'none',
+    tags: ['melee'],
+    // Slow, wide sweep that hits everything in front
+    melee: { arc: 2.2, swing: 0.34 },
+  },
+  knife: {
+    id: 'knife',
+    name: '短刀',
+    price: 15,
+    damage: 6,
+    cooldown: 0.42,
+    range: 120,
+    projectileSpeed: 0,
+    pierce: 0,
+    knockback: 6,
+    spread: 0,
+    projectiles: 1,
+    critMult: 2.5,
+    color: 0xb8c0cc,
+    length: 24,
+    style: 'knife',
+    projectile: 'none',
+    tags: ['melee'],
+    // Quick, narrow stab with a big crit multiplier
+    melee: { arc: 0.7, swing: 0.16 },
+  },
   pistol: {
     id: 'pistol',
     name: '豌豆枪',
@@ -120,7 +169,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     damage: 20,
     cooldown: 1.9,
     range: 480,
-    projectileSpeed: 620,
+    projectileSpeed: 1000,
     pierce: 0,
     knockback: 30,
     spread: 0,
@@ -153,6 +202,27 @@ export const WEAPONS: Record<string, WeaponDef> = {
     tags: ['projectile'],
   },
 };
+
+/**
+ * Melee motion at attack progress k (0..1), shared by hit detection and
+ * rendering so hits land exactly where the weapon is drawn. Angles are
+ * relative to the locked aim.
+ * - `aim`: where the weapon points now
+ * - `from`..`to`: angular window that can be hit so far
+ * - `extend`: 0 = at the grip, 1 = tip at full reach
+ */
+export function meleePose(def: WeaponDef, k: number): { aim: number; from: number; to: number; extend: number } {
+  const arc = def.melee!.arc;
+  if (arc <= 1) {
+    // Thrust: straight out and back, the whole narrow cone is live
+    return { aim: 0, from: -arc / 2, to: arc / 2, extend: Math.sin(Math.PI * Math.min(1, k)) };
+  }
+  // Sweep: shoot out, carve across the arc (eased), pull back at the end
+  const t = Math.min(1, k / 0.75);
+  const swept = -arc / 2 + arc * (1 - (1 - t) * (1 - t));
+  const extend = k < 0.15 ? k / 0.15 : k > 0.85 ? Math.max(0, (1 - k) / 0.15) : 1;
+  return { aim: swept, from: -arc / 2, to: swept, extend };
+}
 
 export function hasTag(def: WeaponDef, tag: WeaponTag): boolean {
   return def.tags.includes(tag);
@@ -204,7 +274,8 @@ export function weaponStats(def: WeaponDef, tier: number): WeaponStats {
   return {
     damage: Math.round(def.damage * t.damage),
     cooldown: Math.round(def.cooldown * t.cooldown * 100) / 100,
-    range: def.range + t.range,
+    // Melee reach grows much less per tier than gun range
+    range: def.range + (def.melee ? Math.round(t.range * 0.3) : t.range),
     knockback: def.knockback * t.knockback,
     critBonus: t.critBonus,
   };

@@ -17,16 +17,19 @@ Controls: **WASD / arrow keys** to move, **Esc / P** or the ❚❚ button to pau
 
 ## Features
 
-- 20 waves with a rising difficulty curve; telegraphed spawns
+- 20 waves with a rising difficulty curve (enemy HP grows every wave); telegraphed spawns
+- Wave 10 mini-boss: a crowned alien overlord that fires bullet rings and charges after a visible windup, with its own HP bar
 - 4 alien enemy types, each with its own look and idle animation: jelly blob, insectoid runner, armored brute, UFO spitter
-- 6 weapons with auto-aim, crits, pierce, spread and knockback (pistol, SMG, shotgun, rifle, rocket launcher with area explosions, gatling); up to 6 at once
+- 8 weapons with auto-aim, crits and knockback; up to 6 at once. Ranged: pistol, SMG, shotgun, rifle, rocket launcher (area explosions), gatling. Melee: club (slow, wide sweep) and knife (fast, narrow stab). Weapons are tagged 投射物 (projectile), 爆炸物 (explosive) or 近战 (melee)
+- Damage = (weapon base + flat melee/ranged damage) × (1 + damage %)
 - Weapon tiers: Common (white) → Rare (blue) → Epic (purple) → Legendary (red). Three of the same weapon and tier merge into one of the next tier automatically (chain merges included); each tier steps up damage, fire rate, range, knockback and crit. Higher tiers show up in the shop in later waves
 - Full weapon slots: buying a weapon that won't merge opens a dialog to recycle one owned weapon for 1/3 of its current price
 - Chinese UI (简体中文)
 - Procedural music and sound effects (Web Audio, no audio files), with music/SFX volume sliders and mute (saved)
-- 15 stats (HP, regen, armor, dodge, damage, attack speed, crit, range, harvesting, explosion size/damage/chance, …)
-- Explosion items: bigger blasts, stronger blasts, and a chance for any bullet to explode
-- XP and level-ups, materials, shop with items, weapons and rerolls
+- 16 stats (HP, regen, armor, dodge, melee/ranged damage, damage %, attack speed, crit, range, harvesting, explosion size/damage, …)
+- 25 items in 8 connection groups (melee, ranged, explosive, firepower, precision, survival, agility, economy); owning an item makes others in its group slightly likelier in the shop, and the shop favors cheap items early and pricier ones later
+- Explosion items for bigger and stronger blasts; layered explosion VFX (flash, shockwave, sparks, smoke, scorch marks, screen shake)
+- XP and level-ups (each heals 3 HP; choices are picked at wave end and roll white/blue/purple rarity for bigger bonuses), materials, shop with items, weapons and rerolls
 - Best wave saved in `localStorage`
 
 ## Architecture
@@ -57,19 +60,20 @@ Measured in headless Chromium with 320 live enemies: ~0.5 ms per simulation step
 The game instance is exposed as `__game` in the browser console:
 
 ```js
-__game.debug.spawn(200)          // spawn enemies ('blob' | 'runner' | 'brute' | 'spitter')
+__game.debug.spawn(200)          // spawn enemies ('blob' | 'runner' | 'brute' | 'spitter' | 'boss')
 __game.debug.god()               // invincible
 __game.debug.give(100)           // materials
-__game.debug.weapon('rocket', 2)  // id: 'pistol' | 'smg' | 'shotgun' | 'rifle' | 'rocket' | 'gatling', tier 1-4
+__game.debug.weapon('rocket', 2)  // id: 'club' | 'knife' | 'pistol' | 'smg' | 'shotgun' | 'rifle' | 'rocket' | 'gatling', tier 1-4
 __game.debug.skipWave()
 ```
 
 ## Roadmap
 
 - [x] Weapon tiers and merging
-- [ ] Melee weapons
+- [x] Melee weapons
 - [ ] Characters with starting bonuses
-- [ ] Elite and boss waves
+- [x] Boss wave (wave 10)
+- [ ] Elite waves
 - [x] Sound effects and music
 - [ ] English/Chinese language switch
 - [ ] Touch controls (virtual joystick)

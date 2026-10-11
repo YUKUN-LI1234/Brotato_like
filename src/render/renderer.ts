@@ -1,4 +1,6 @@
 import { BitmapText, Container, Graphics, Sprite, type Application } from 'pixi.js';
+import { meleePose } from '../data/weapons';
+import type { WeaponSlot } from '../game/types';
 import type { Body } from '../game/types';
 import { ARENA_H, ARENA_W, type World } from '../game/world';
 import { ExplosionFx, particleLook, type FxLayer, type Particle } from './fx';
@@ -81,10 +83,14 @@ export class GameRenderer {
       const art = this.tex.weapons[weaponKey(slot.def.id, slot.tier)];
       s.texture = art.texture;
       s.anchor.set(art.anchor.x, art.anchor.y);
-      s.position.set(pp.x + slot.ox, pp.y + slot.oy);
-      s.rotation = slot.angle;
+      const ox = pp.x + slot.ox;
+      const oy = pp.y + slot.oy;
+      const pose = slot.def.melee && slot.swing > 0 ? this.meleePose(slot) : { angle: slot.angle, lunge: 0 };
+      const angle = pose.angle;
+      s.position.set(ox + Math.cos(angle) * pose.lunge, oy + Math.sin(angle) * pose.lunge);
+      s.rotation = angle;
       // Keep guns upright when aiming left
-      s.scale.y = Math.cos(slot.angle) < 0 ? -1 : 1;
+      s.scale.y = Math.cos(angle) < 0 ? -1 : 1;
     }, 1);
 
     this.sync(this.layers.shadows, w.enemies, (s, e) => {
@@ -116,6 +122,17 @@ export class GameRenderer {
           sy = 1 - Math.abs(Math.sin(phase * 4)) * 0.06;
           sx = 2 - sy;
           break;
+        case 'boss': // slow heave; shudder while winding up, lean into the charge
+          sy = 1 + Math.sin(phase * 2.5) * 0.04;
+          sx = 2 - sy;
+          if (e.mode === 'windup') {
+            dy = Math.sin(t * 90) * 3;
+            sx *= 1.08;
+            sy *= 0.92;
+          } else if (e.mode === 'dash') {
+            s.rotation = Math.atan2(e.dirY, e.dirX * face) * 0.25;
+          }
+          break;
         case 'spitter': // hover and tilt
           dy = -8 + Math.sin(phase * 4) * 4;
           s.rotation = Math.sin(phase * 3) * 0.08 * face;
@@ -126,7 +143,8 @@ export class GameRenderer {
       }
       s.position.set(ep.x, ep.y + dy);
       s.scale.set(face * sx, sy);
-      s.tint = e.flash > 0 ? 0xff9090 : 0xffffff;
+      const windupGlow = e.mode === 'windup' && Math.floor(t * 16) % 2 === 0;
+      s.tint = e.flash > 0 || windupGlow ? 0xff9090 : 0xffffff;
     });
 
     this.sync(this.layers.markers, w.markers, (s, m) => {
@@ -168,6 +186,17 @@ export class GameRenderer {
     this.syncParticles(this.layers.effects, this.fxByLayer.fire);
 
     this.syncTexts(w);
+  }
+
+  /**
+   * Melee animation. Sweeps (wide arc) shoot out to full reach, swing
+   * across the arc, then pull back. Thrusts stab straight out and back.
+   */
+  private meleePose(slot: WeaponSlot): { angle: number; lunge: number } {
+    const pose = meleePose(slot.def, 1 - slot.swing / slot.def.melee!.swing);
+    // Distance from grip to the weapon's base so its tip lands on the reach
+    const full = Math.max(0, slot.swingReach - slot.def.length);
+    return { angle: slot.swingAngle + pose.aim, lunge: full * pose.extend };
   }
 
   private syncParticles(layer: Container, items: readonly Particle[]): void {

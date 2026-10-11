@@ -10,8 +10,8 @@ export interface ShopOffer {
   /** Weapon quality 1..4; items use 0. */
   tier: number;
   price: number;
-  /** Weapon class labels, e.g. "爆炸物". */
-  tags: string[];
+  /** Weapon class or item connection labels; `linked` = shared with an owned item. */
+  tags: { label: string; linked: boolean }[];
   lines: string[];
   color: number;
   sold: boolean;
@@ -99,7 +99,11 @@ export class Screens {
     const row = el('div', 'cards');
     options.forEach((u, i) => {
       const card = el('button', 'card');
-      card.append(el('div', 'card-title', STAT_LABELS[u.stat]), el('div', 'card-line good', formatStatMod(u.stat, u.amount)));
+      const rarity = TIERS[u.rarity - 1];
+      card.style.borderColor = cssColor(rarity.color);
+      const title = el('div', 'card-title', STAT_LABELS[u.stat]);
+      title.style.color = cssColor(rarity.color);
+      card.append(el('div', 'card-kind tier', rarity.name), title, el('div', 'card-line good', formatStatMod(u.stat, u.amount)));
       card.append(el('div', 'key', String(i + 1)));
       card.addEventListener('click', () => onPick(u));
       row.append(card);
@@ -152,7 +156,11 @@ export class Screens {
     card.append(title);
     if (o.tags.length > 0) {
       const tags = el('div', 'card-tags');
-      for (const tag of o.tags) tags.append(el('span', 'tag-chip', tag));
+      for (const tag of o.tags) {
+        const chip = el('span', `tag-chip${tag.linked ? ' linked' : ''}`, tag.label);
+        if (tag.linked) chip.title = '已拥有同类道具，这类道具更容易出现';
+        tags.append(chip);
+      }
       card.append(tags);
     }
     for (const line of o.lines) card.append(el('div', `card-line ${line.includes('-') ? 'bad' : 'good'}`, line));

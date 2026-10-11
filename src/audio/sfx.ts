@@ -11,6 +11,8 @@ export type SfxName =
   | 'fire_rocket'
   | 'fire_gatling'
   | 'explosion'
+  | 'swing'
+  | 'thud'
   | 'hit'
   | 'hit_crit'
   | 'kill';
@@ -106,6 +108,28 @@ const RECIPES: Record<SfxName, { dur: number; gain: number; voice: Voice }> = {
         sine(s, 0, sweep(t, 110, 32, 0.35)) * Math.exp(-t * 7) * 1.1 +
         lowpass(s, 0, n, 0.12) * Math.exp(-t * 4.5) * 1.6 +
         n * Math.exp(-t * 35) * 0.5
+      );
+    },
+  },
+  // Melee whoosh: high-passed noise that swells and fades
+  swing: {
+    dur: 0.2,
+    gain: 0.5,
+    voice: (t, s) => {
+      const n = s.noise();
+      return (n - lowpass(s, 0, n, 0.12)) * Math.sin(Math.PI * Math.min(t / 0.18, 1)) * 0.8;
+    },
+  },
+  // Punching-bag thud: dull low body, muffled cloth slap, no ring
+  thud: {
+    dur: 0.24,
+    gain: 0.9,
+    voice: (t, s) => {
+      const n = s.noise();
+      return (
+        sine(s, 0, sweep(t, 150, 55, 0.1)) * Math.exp(-t * 20) * 1.1 +
+        lowpass(s, 0, n, 0.06) * Math.exp(-t * 22) * 2.2 +
+        lowpass(s, 1, n, 0.35) * Math.exp(-t * 90) * 0.35
       );
     },
   },

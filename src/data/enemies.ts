@@ -1,4 +1,4 @@
-export type Behavior = 'chase' | 'ranged';
+export type Behavior = 'chase' | 'ranged' | 'boss';
 
 export interface EnemyDef {
   id: string;
@@ -76,3 +76,22 @@ export const ENEMIES: EnemyDef[] = [
     weight: 2,
   },
 ];
+
+/**
+ * Mini-boss of wave BOSS_WAVE. Not in ENEMIES, so it never spawns randomly.
+ * Alternates between a radial bullet burst and a telegraphed charge.
+ */
+export const BOSS: EnemyDef = {
+  id: 'boss',
+  hp: 1500,
+  hpPerWave: 0,
+  speed: 70,
+  damage: 6,
+  damagePerWave: 0,
+  radius: 54,
+  color: 0xb03a48,
+  behavior: 'boss',
+  materials: 40,
+  firstWave: 99,
+  weight: 0,
+};

@@ -26,6 +26,8 @@ const THROTTLE: Partial<Record<SfxName, number>> = {
   fire_rocket: 0.08,
   fire_gatling: 0.06,
   explosion: 0.06,
+  swing: 0.05,
+  thud: 0.045,
   hit: 0.035,
   hit_crit: 0.05,
   kill: 0.04,

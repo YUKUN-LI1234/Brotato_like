@@ -11,6 +11,8 @@ export class Hud {
   private readonly materials: HTMLElement;
   private readonly wave: HTMLElement;
   private readonly timer: HTMLElement;
+  private readonly boss: HTMLElement;
+  private readonly bossFill: HTMLElement;
   private readonly cache = new Map<HTMLElement, string>();
 
   constructor(parent: HTMLElement) {
@@ -25,6 +27,7 @@ export class Hud {
         <div class="wave"></div>
         <div class="timer"></div>
       </div>
+      <div class="boss-bar"><b>BOSS</b><div class="bar"><div class="fill"></div></div></div>
       <button class="pause-btn" title="暂停 (Esc / P)" aria-label="暂停"><i></i><i></i></button>`;
     parent.appendChild(this.root);
     const q = (s: string) => this.root.querySelector(s) as HTMLElement;
@@ -35,6 +38,8 @@ export class Hud {
     this.materials = q('.materials span');
     this.wave = q('.wave');
     this.timer = q('.timer');
+    this.boss = q('.boss-bar');
+    this.bossFill = q('.boss-bar .fill');
   }
 
   onPause(handler: () => void): void {
@@ -62,6 +67,9 @@ export class Hud {
     this.set(this.wave, `第 ${w.wave} 波`);
     this.set(this.timer, String(remaining));
     this.timer.classList.toggle('urgent', remaining <= 5);
+    const boss = w.enemies.find((e) => e.def.behavior === 'boss' && !e.dead);
+    this.boss.classList.toggle('show', !!boss);
+    if (boss) this.setWidth(this.bossFill, boss.hp / boss.maxHp);
   }
 
   private set(node: HTMLElement, text: string): void {
