@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Controls: **WASD / arrow keys** to move, **1–4** to pick a level-up, **Enter** on focused buttons.
+Controls: **WASD / arrow keys** to move, **Esc / P** or the ❚❚ button to pause, **M** to mute, **1–4** to pick a level-up, **Enter** on focused buttons. Switching browser tabs pauses automatically.
 
 `npm run build` writes a static site to `dist/`. Pushing to `main` deploys it to GitHub Pages (see `.github/workflows/deploy.yml`; enable *Settings → Pages → Source: GitHub Actions* once).
 

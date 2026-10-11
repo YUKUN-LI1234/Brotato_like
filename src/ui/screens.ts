@@ -237,6 +237,17 @@ export class Screens {
     );
   }
 
+  pause(wave: number, secondsLeft: number, onResume: () => void, onRestart: () => void, onMenu: () => void): void {
+    const panel = el('div', 'panel menu');
+    panel.append(el('h1', '', '已暂停'), el('p', 'sub', `第 ${wave} 波 · 剩余 ${secondsLeft} 秒`));
+    const resume = button('继续游戏', onResume, 'primary');
+    const actions = el('div', 'pause-actions');
+    actions.append(resume, button('重新开始', onRestart), button('返回主菜单', onMenu));
+    panel.append(actions, el('p', 'hint', 'Esc / P 继续'));
+    this.open(panel);
+    resume.focus();
+  }
+
   gameOver(won: boolean, wave: number, kills: number, onRestart: () => void): void {
     const panel = el('div', 'panel menu');
     panel.append(

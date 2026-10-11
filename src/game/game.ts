@@ -25,7 +25,7 @@ import type { GameEvent } from './types';
 import type { WeaponSlot } from './types';
 import { addWeapon, ARENA_H, ARENA_W, canAcquire, maxHpOf, mergeProgress, removeWeapon, World, type MergeResult } from './world';
 
-export type GameState = 'menu' | 'wave' | 'levelup' | 'shop' | 'gameover';
+export type GameState = 'menu' | 'wave' | 'paused' | 'levelup' | 'shop' | 'gameover';
 
 const STEP = 1 / 60;
 const BEST_KEY = 'brotato_like.bestWave';
@@ -63,6 +63,14 @@ export class Game {
     this.volume = new VolumeControl(uiRoot, this.audio);
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyM') this.toggleMute();
+    });
+    this.hud.onPause(() => this.togglePause());
+    window.addEventListener('keydown', (e) => {
+      if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) this.togglePause();
+    });
+    // Switching tabs mid-wave pauses instead of letting the player die off-screen
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.state === 'wave') this.pause();
     });
     this.showMenu();
     this.loop.start();
@@ -113,6 +121,32 @@ export class Game {
 
     if (w.playerDead) this.endRun(false);
     else if (w.waveTime >= w.waveDuration) this.endWave();
+  }
+
+  togglePause(): void {
+    if (this.state === 'wave') this.pause();
+    else if (this.state === 'paused') this.resume();
+  }
+
+  pause(): void {
+    if (this.state !== 'wave') return;
+    const w = this.world;
+    this.state = 'paused';
+    this.audio.setMusic('calm');
+    this.screens.pause(
+      w.wave,
+      Math.max(0, Math.ceil(w.waveDuration - w.waveTime)),
+      () => this.resume(),
+      () => this.newRun(),
+      () => this.showMenu(),
+    );
+  }
+
+  resume(): void {
+    if (this.state !== 'paused') return;
+    this.state = 'wave';
+    this.audio.setMusic('wave');
+    this.screens.hide();
   }
 
   private playEvents(events: readonly GameEvent[]): void {

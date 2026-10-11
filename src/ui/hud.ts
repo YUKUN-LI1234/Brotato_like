@@ -24,7 +24,8 @@ export class Hud {
       <div class="hud-center">
         <div class="wave"></div>
         <div class="timer"></div>
-      </div>`;
+      </div>
+      <button class="pause-btn" title="暂停 (Esc / P)" aria-label="暂停"><i></i><i></i></button>`;
     parent.appendChild(this.root);
     const q = (s: string) => this.root.querySelector(s) as HTMLElement;
     this.hpFill = q('.hp .fill');
@@ -34,6 +35,14 @@ export class Hud {
     this.materials = q('.materials span');
     this.wave = q('.wave');
     this.timer = q('.timer');
+  }
+
+  onPause(handler: () => void): void {
+    const btn = this.root.querySelector('.pause-btn') as HTMLButtonElement;
+    btn.addEventListener('click', () => {
+      btn.blur();
+      handler();
+    });
   }
 
   show(visible: boolean): void {
