@@ -15,6 +15,12 @@ export interface Stats {
   harvesting: number;
   pickupRange: number;
   luck: number;
+  /** Explosion radius, % */
+  explosionSize: number;
+  /** Explosion damage, % */
+  explosionDamage: number;
+  /** Chance for any bullet hit to explode, % */
+  explodeChance: number;
 }
 
 export type StatKey = keyof Stats;
@@ -32,6 +38,9 @@ export const BASE_STATS: Readonly<Stats> = {
   harvesting: 0,
   pickupRange: 0,
   luck: 0,
+  explosionSize: 0,
+  explosionDamage: 0,
+  explodeChance: 0,
 };
 
 export const STAT_LABELS: Record<StatKey, string> = {
@@ -47,6 +56,9 @@ export const STAT_LABELS: Record<StatKey, string> = {
   harvesting: '收获',
   pickupRange: '拾取范围',
   luck: '幸运',
+  explosionSize: '爆炸范围',
+  explosionDamage: '爆炸伤害',
+  explodeChance: '爆炸几率',
 };
 
 const PERCENT_STATS = new Set<StatKey>([
@@ -57,6 +69,9 @@ const PERCENT_STATS = new Set<StatKey>([
   'critChance',
   'pickupRange',
   'luck',
+  'explosionSize',
+  'explosionDamage',
+  'explodeChance',
 ]);
 
 export const STAT_ORDER = Object.keys(STAT_LABELS) as StatKey[];

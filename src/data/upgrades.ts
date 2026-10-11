@@ -19,4 +19,5 @@ export const UPGRADES: Upgrade[] = [
   { stat: 'harvesting', amount: 6 },
   { stat: 'luck', amount: 8 },
   { stat: 'pickupRange', amount: 25 },
+  { stat: 'explosionSize', amount: 12 },
 ];

@@ -33,6 +33,37 @@ export function damageEnemy(
   if (killed) killEnemy(w, e);
 }
 
+const blastTargets: Enemy[] = [];
+
+/**
+ * Area damage around (x, y). Radius and damage scale with the explosion
+ * stats; enemies are pushed away from the center.
+ */
+export function explode(
+  w: World,
+  x: number,
+  y: number,
+  baseRadius: number,
+  baseDamage: number,
+  knockback: number,
+  crit: boolean,
+): void {
+  const s = w.player.stats;
+  const radius = baseRadius * Math.max(0.2, 1 + s.explosionSize / 100);
+  const damage = Math.max(1, Math.round(baseDamage * Math.max(0.1, 1 + s.explosionDamage / 100)));
+  w.enemyHash.query(x, y, radius + 40, blastTargets);
+  for (const e of blastTargets) {
+    if (e.dead) continue;
+    const dx = e.x - x;
+    const dy = e.y - y;
+    const d = Math.hypot(dx, dy);
+    if (d > radius + e.r) continue;
+    damageEnemy(w, e, damage, crit, d > 0 ? dx / d : 0, d > 0 ? dy / d : 0, knockback);
+  }
+  w.explosions.push({ x, y, radius, t: 0, life: 0.35 });
+  w.events.push({ type: 'explosion' });
+}
+
 export function killEnemy(w: World, e: Enemy): void {
   e.dead = true;
   w.kills++;

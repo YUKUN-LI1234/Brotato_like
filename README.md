@@ -18,13 +18,14 @@ Controls: **WASD / arrow keys** to move, **1–4** to pick a level-up, **Enter**
 ## Features
 
 - 20 waves with a rising difficulty curve; telegraphed spawns
-- 4 enemy types (chaser, fast runner, tank, ranged spitter)
-- 4 weapons with auto-aim, crits, pierce, spread and knockback; up to 6 at once
+- 4 alien enemy types, each with its own look and idle animation: jelly blob, insectoid runner, armored brute, UFO spitter
+- 6 weapons with auto-aim, crits, pierce, spread and knockback (pistol, SMG, shotgun, rifle, rocket launcher with area explosions, gatling); up to 6 at once
 - Weapon tiers: Common (white) → Rare (blue) → Epic (purple) → Legendary (red). Three of the same weapon and tier merge into one of the next tier automatically (chain merges included); each tier steps up damage, fire rate, range, knockback and crit. Higher tiers show up in the shop in later waves
 - Full weapon slots: buying a weapon that won't merge opens a dialog to recycle one owned weapon for 1/3 of its current price
 - Chinese UI (简体中文)
 - Procedural music and sound effects (Web Audio, no audio files), with music/SFX volume sliders and mute (saved)
-- 12 stats (HP, regen, armor, dodge, damage, attack speed, crit, range, harvesting, …)
+- 15 stats (HP, regen, armor, dodge, damage, attack speed, crit, range, harvesting, explosion size/damage/chance, …)
+- Explosion items: bigger blasts, stronger blasts, and a chance for any bullet to explode
 - XP and level-ups, materials, shop with items, weapons and rerolls
 - Best wave saved in `localStorage`
 
@@ -59,7 +60,7 @@ The game instance is exposed as `__game` in the browser console:
 __game.debug.spawn(200)          // spawn enemies ('blob' | 'runner' | 'brute' | 'spitter')
 __game.debug.god()               // invincible
 __game.debug.give(100)           // materials
-__game.debug.weapon('shotgun', 2) // id: 'pistol' | 'smg' | 'shotgun' | 'rifle', tier 1-4
+__game.debug.weapon('rocket', 2)  // id: 'pistol' | 'smg' | 'shotgun' | 'rifle' | 'rocket' | 'gatling', tier 1-4
 __game.debug.skipWave()
 ```
 

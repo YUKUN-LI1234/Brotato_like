@@ -8,6 +8,9 @@ export type SfxName =
   | 'fire_smg'
   | 'fire_shotgun'
   | 'fire_rifle'
+  | 'fire_rocket'
+  | 'fire_gatling'
+  | 'explosion'
   | 'hit'
   | 'hit_crit'
   | 'kill';
@@ -74,6 +77,37 @@ const RECIPES: Record<SfxName, { dur: number; gain: number; voice: Voice }> = {
       s.noise() * Math.exp(-t * 85) * 0.9 +
       sine(s, 0, sweep(t, 320, 55, 0.25)) * Math.exp(-t * 9) * 0.6 +
       lowpass(s, 0, s.noise(), 0.08) * Math.exp(-t * 7) * 0.9,
+  },
+  // Rocket launch: rising airy whoosh over a soft pop
+  fire_rocket: {
+    dur: 0.4,
+    gain: 0.55,
+    voice: (t, s) => {
+      const n = s.noise();
+      const k = 0.05 + Math.min(t / 0.35, 1) * 0.35; // filter opens = rising pitch
+      const air = lowpass(s, 0, n, k) - lowpass(s, 1, n, 0.03);
+      return air * Math.sin(Math.min(t / 0.4, 1) * Math.PI) * 1.8 + sine(s, 0, sweep(t, 180, 90, 0.1)) * Math.exp(-t * 30) * 0.5;
+    },
+  },
+  // Gatling: very short, low, dry tick so 12 shots/s stay readable
+  fire_gatling: {
+    dur: 0.05,
+    gain: 0.32,
+    voice: (t, s) =>
+      lowpass(s, 0, s.noise(), 0.35) * Math.exp(-t * 90) * 1.4 + square(s, 0, sweep(t, 420, 200, 0.04)) * Math.exp(-t * 80) * 0.25,
+  },
+  // Explosion: deep thump, crackle, long rumbling tail
+  explosion: {
+    dur: 0.9,
+    gain: 0.85,
+    voice: (t, s) => {
+      const n = s.noise();
+      return (
+        sine(s, 0, sweep(t, 110, 32, 0.35)) * Math.exp(-t * 7) * 1.1 +
+        lowpass(s, 0, n, 0.12) * Math.exp(-t * 4.5) * 1.6 +
+        n * Math.exp(-t * 35) * 0.5
+      );
+    },
   },
   // Fleshy "thwack": band-limited noise and a dropping blip
   hit: {

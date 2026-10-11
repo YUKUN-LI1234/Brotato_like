@@ -15,6 +15,8 @@ export interface ShotSpec {
   hostile: boolean;
   color: number;
   r: number;
+  explosion?: number;
+  kind?: 'bullet' | 'rocket';
 }
 
 export function updateWeapons(w: World, dt: number): void {
@@ -67,7 +69,9 @@ function fireWeapon(w: World, slot: WeaponSlot, x: number, y: number, range: num
       crit,
       hostile: false,
       color: crit ? 0xffd84a : tierColor,
-      r: 6,
+      r: def.projectile === 'rocket' ? 9 : 6,
+      explosion: def.explosionRadius ?? 0,
+      kind: def.projectile,
     });
   }
 }
@@ -86,6 +90,8 @@ export function fireProjectile(w: World, s: ShotSpec): void {
   pr.hostile = s.hostile;
   pr.color = s.color;
   pr.r = s.r;
+  pr.explosion = s.explosion ?? 0;
+  pr.kind = s.kind ?? 'bullet';
   pr.hits.length = 0;
   w.projectiles.push(pr);
 }

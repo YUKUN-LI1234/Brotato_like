@@ -6,6 +6,11 @@ export function cleanup(w: World, dt: number): void {
   for (let i = w.enemies.length - 1; i >= 0; i--) {
     if (w.enemies[i].dead) w.enemyPool.release(swapRemove(w.enemies, i));
   }
+  for (let i = w.explosions.length - 1; i >= 0; i--) {
+    const ex = w.explosions[i];
+    ex.t += dt;
+    if (ex.t >= ex.life) swapRemove(w.explosions, i);
+  }
   for (let i = w.texts.length - 1; i >= 0; i--) {
     const t = w.texts[i];
     t.t -= dt;
@@ -21,4 +26,5 @@ export function clearWave(w: World): void {
   w.projectiles.length = 0;
   w.markers.length = 0;
   w.texts.length = 0;
+  w.explosions.length = 0;
 }

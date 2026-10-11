@@ -68,6 +68,9 @@ export interface Projectile extends Body {
   /** Fired by an enemy (hits the player) instead of by the player. */
   hostile: boolean;
   color: number;
+  /** Explosion radius on impact (0 = plain bullet). */
+  explosion: number;
+  kind: 'bullet' | 'rocket';
   /** Enemies already hit, so a piercing shot never hits the same one twice. */
   hits: Enemy[];
 }
@@ -86,6 +89,14 @@ export interface SpawnMarker {
   def: EnemyDef;
 }
 
+export interface Explosion {
+  x: number;
+  y: number;
+  radius: number;
+  t: number;
+  life: number;
+}
+
 export interface FloatText {
   x: number;
   y: number;
@@ -101,4 +112,5 @@ export interface FloatText {
  */
 export type GameEvent =
   | { type: 'fire'; weapon: string }
-  | { type: 'enemyHit'; crit: boolean; killed: boolean };
+  | { type: 'enemyHit'; crit: boolean; killed: boolean }
+  | { type: 'explosion' };

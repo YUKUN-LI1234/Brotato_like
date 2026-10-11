@@ -17,6 +17,12 @@ export interface WeaponDef {
   critMult: number;
   color: number;
   length: number;
+  /** Drawing style of the gun sprite. */
+  style: 'gun' | 'tube' | 'gatling';
+  /** Projectile look. */
+  projectile: 'bullet' | 'rocket';
+  /** If set, the shot explodes on impact/at max range with this base radius. */
+  explosionRadius?: number;
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
@@ -35,6 +41,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
     critMult: 2,
     color: 0x9aa4b1,
     length: 22,
+    style: 'gun',
+    projectile: 'bullet',
   },
   smg: {
     id: 'smg',
@@ -51,6 +59,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
     critMult: 1.5,
     color: 0x6f8f6a,
     length: 26,
+    style: 'gun',
+    projectile: 'bullet',
   },
   shotgun: {
     id: 'shotgun',
@@ -67,6 +77,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
     critMult: 2,
     color: 0x8b5a3c,
     length: 28,
+    style: 'gun',
+    projectile: 'bullet',
   },
   rifle: {
     id: 'rifle',
@@ -83,6 +95,46 @@ export const WEAPONS: Record<string, WeaponDef> = {
     critMult: 3,
     color: 0x4a5a7a,
     length: 34,
+    style: 'gun',
+    projectile: 'bullet',
+  },
+  rocket: {
+    id: 'rocket',
+    name: '火箭筒',
+    price: 40,
+    // Damage is dealt by the explosion, to everything in the radius
+    damage: 20,
+    cooldown: 1.9,
+    range: 480,
+    projectileSpeed: 620,
+    pierce: 0,
+    knockback: 30,
+    spread: 0,
+    projectiles: 1,
+    critMult: 2,
+    color: 0x5d7a3a,
+    length: 38,
+    style: 'tube',
+    projectile: 'rocket',
+    explosionRadius: 90,
+  },
+  gatling: {
+    id: 'gatling',
+    name: '加特林',
+    price: 45,
+    damage: 3,
+    cooldown: 0.08,
+    range: 380,
+    projectileSpeed: 1150,
+    pierce: 0,
+    knockback: 3,
+    spread: 0.16,
+    projectiles: 1,
+    critMult: 1.5,
+    color: 0x7a7f88,
+    length: 34,
+    style: 'gatling',
+    projectile: 'bullet',
   },
 };
 

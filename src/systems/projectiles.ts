@@ -1,7 +1,7 @@
 import { swapRemove } from '../core/pool';
 import type { Enemy } from '../game/types';
 import { ARENA_H, ARENA_W, type World } from '../game/world';
-import { damageEnemy, damagePlayer } from './combat';
+import { damageEnemy, damagePlayer, explode } from './combat';
 
 const candidates: Enemy[] = [];
 
@@ -16,7 +16,12 @@ export function updateProjectiles(w: World, dt: number): void {
     pr.y += pr.vy * dt;
     pr.life -= dt;
 
-    let remove = pr.life <= 0 || pr.x < -50 || pr.y < -50 || pr.x > ARENA_W + 50 || pr.y > ARENA_H + 50;
+    const outOfArena = pr.x < -50 || pr.y < -50 || pr.x > ARENA_W + 50 || pr.y > ARENA_H + 50;
+    let remove = pr.life <= 0 || outOfArena;
+    // Rockets that reach max range still go off
+    if (remove && !outOfArena && !pr.hostile && pr.explosion > 0) {
+      explode(w, pr.x, pr.y, pr.explosion, pr.damage, pr.knockback, pr.crit);
+    }
 
     if (!remove && pr.hostile) {
       if (Math.hypot(p.x - pr.x, p.y - pr.y) < p.r + pr.r && p.iframes <= 0) {
@@ -39,8 +44,16 @@ function hitEnemies(w: World, pr: World['projectiles'][number]): boolean {
     if (e.dead || pr.hits.includes(e)) continue;
     if (Math.hypot(e.x - pr.x, e.y - pr.y) >= e.r + pr.r) continue;
 
+    if (pr.explosion > 0) {
+      explode(w, pr.x, pr.y, pr.explosion, pr.damage, pr.knockback, pr.crit);
+      return true;
+    }
     damageEnemy(w, e, pr.damage, pr.crit, pr.vx / speed, pr.vy / speed, pr.knockback);
     pr.hits.push(e);
+    // "Explode chance" items: any bullet hit may also blow up (half damage)
+    if (w.rng.next() * 100 < w.player.stats.explodeChance) {
+      explode(w, pr.x, pr.y, 55, pr.damage * 0.5, pr.knockback * 0.5, pr.crit);
+    }
     if (pr.pierce <= 0) return true;
     pr.pierce--;
     pr.damage = Math.max(1, Math.round(pr.damage * 0.5));

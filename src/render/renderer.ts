@@ -1,7 +1,7 @@
 import { BitmapText, Container, Graphics, Sprite, type Application } from 'pixi.js';
 import type { Body } from '../game/types';
 import { ARENA_H, ARENA_W, type World } from '../game/world';
-import { buildTextures, weaponKey, type TextureSet } from './textures';
+import { BLAST_RADIUS, buildTextures, weaponKey, type TextureSet } from './textures';
 
 /** World units visible across the shorter screen axis. */
 const VIEW_HEIGHT = 820;
@@ -16,15 +16,18 @@ export class GameRenderer {
   private readonly layers = {
     floor: new Container(),
     markers: new Container(),
+    shadows: new Container(),
     pickups: new Container(),
     enemies: new Container(),
     player: new Container(),
     projectiles: new Container(),
+    effects: new Container(),
     texts: new Container(),
   };
   private readonly pools = new Map<Container, Sprite[]>();
   private readonly textPool: BitmapText[] = [];
   private readonly playerSprite: Sprite;
+  private readonly playerShadow: Sprite;
   private camX = ARENA_W / 2;
   private camY = ARENA_H / 2;
 
@@ -36,6 +39,9 @@ export class GameRenderer {
     this.playerSprite = new Sprite(this.tex.player);
     this.playerSprite.anchor.set(0.5);
     this.layers.player.addChild(this.playerSprite);
+    this.playerShadow = new Sprite(this.tex.shadow);
+    this.playerShadow.anchor.set(0.5);
+    this.layers.shadows.addChild(this.playerShadow);
   }
 
   render(w: World, alpha: number): void {
@@ -58,25 +64,57 @@ export class GameRenderer {
     const bob = p.moving ? Math.sin(t * 18) * 0.06 : Math.sin(t * 3) * 0.02;
     ps.scale.set(p.facing * (1 - bob), 1 + bob);
     ps.alpha = p.iframes > 0 && Math.floor(t * 20) % 2 === 0 ? 0.4 : 1;
+    this.playerShadow.position.set(pp.x, pp.y + p.r * 1.15);
 
     this.sync(this.layers.player, p.weapons, (s, slot) => {
-      const key = weaponKey(slot.def.id, slot.tier);
-      const anchor = this.tex.weaponAnchors[key];
-      s.texture = this.tex.weapons[key];
-      s.anchor.set(anchor.x, anchor.y);
+      const art = this.tex.weapons[weaponKey(slot.def.id, slot.tier)];
+      s.texture = art.texture;
+      s.anchor.set(art.anchor.x, art.anchor.y);
       s.position.set(pp.x + slot.ox, pp.y + slot.oy);
       s.rotation = slot.angle;
       // Keep guns upright when aiming left
       s.scale.y = Math.cos(slot.angle) < 0 ? -1 : 1;
     }, 1);
 
+    this.sync(this.layers.shadows, w.enemies, (s, e) => {
+      const ep = lerp(e);
+      s.texture = this.tex.shadow;
+      s.anchor.set(0.5);
+      // Saucers hover, so their shadow sits further below
+      s.position.set(ep.x, ep.y + e.r * (e.def.id === 'spitter' ? 1.5 : 1.0));
+      s.scale.set(e.r / 18);
+    }, 1);
+
     this.sync(this.layers.enemies, w.enemies, (s, e) => {
       const ep = lerp(e);
-      s.texture = this.tex.enemies[e.def.id];
-      s.anchor.set(0.5);
-      s.position.set(ep.x, ep.y);
-      const wobble = Math.sin(t * 10 + e.x * 0.05) * 0.06;
-      s.scale.set((ep.x < pp.x ? 1 : -1) * (1 + wobble), 1 - wobble);
+      const art = this.tex.enemies[e.def.id];
+      s.texture = art.texture;
+      s.anchor.set(art.anchor.x, art.anchor.y);
+      const face = ep.x < pp.x ? 1 : -1;
+      const phase = t + e.px * 0.013; // desync identical enemies
+      let sx = 1;
+      let sy = 1;
+      let dy = 0;
+      s.rotation = 0;
+      switch (e.def.id) {
+        case 'runner': // fast skitter
+          s.rotation = Math.sin(phase * 32) * 0.07;
+          dy = -Math.abs(Math.sin(phase * 16)) * 2;
+          break;
+        case 'brute': // heavy stomp
+          sy = 1 - Math.abs(Math.sin(phase * 4)) * 0.06;
+          sx = 2 - sy;
+          break;
+        case 'spitter': // hover and tilt
+          dy = -8 + Math.sin(phase * 4) * 4;
+          s.rotation = Math.sin(phase * 3) * 0.08 * face;
+          break;
+        default: // jelly squish
+          sy = 1 + Math.sin(phase * 9) * 0.07;
+          sx = 2 - sy;
+      }
+      s.position.set(ep.x, ep.y + dy);
+      s.scale.set(face * sx, sy);
       s.tint = e.flash > 0 ? 0xff9090 : 0xffffff;
     });
 
@@ -97,11 +135,29 @@ export class GameRenderer {
 
     this.sync(this.layers.projectiles, w.projectiles, (s, pr) => {
       const prp = lerp(pr);
-      s.texture = this.tex.bullet;
       s.anchor.set(0.5);
       s.position.set(prp.x, prp.y);
-      s.scale.set(pr.r / 8);
-      s.tint = pr.color;
+      if (pr.kind === 'rocket') {
+        s.texture = this.tex.rocket;
+        s.rotation = Math.atan2(pr.vy, pr.vx);
+        s.scale.set(1.15);
+        s.tint = 0xffffff;
+      } else {
+        s.texture = this.tex.bullet;
+        s.rotation = 0;
+        s.scale.set(pr.r / 8);
+        s.tint = pr.color;
+      }
+    });
+
+    this.sync(this.layers.effects, w.explosions, (s, ex) => {
+      const k = ex.t / ex.life;
+      s.texture = this.tex.blast;
+      s.anchor.set(0.5);
+      s.position.set(ex.x, ex.y);
+      // Fast pop out, then fade
+      s.scale.set((ex.radius / BLAST_RADIUS) * (0.55 + 0.45 * Math.sqrt(k)));
+      s.alpha = 1 - k * k;
     });
 
     this.syncTexts(w);

@@ -35,6 +35,8 @@ const FIRE_SOUND: Record<string, SfxName> = {
   smg: 'fire_smg',
   shotgun: 'fire_shotgun',
   rifle: 'fire_rifle',
+  rocket: 'fire_rocket',
+  gatling: 'fire_gatling',
 };
 
 /** Owns the loop and moves between states: menu → wave → level-up → shop → wave … */
@@ -118,6 +120,8 @@ export class Game {
       if (ev.type === 'fire') {
         const name = FIRE_SOUND[ev.weapon];
         if (name) this.audio.play(name);
+      } else if (ev.type === 'explosion') {
+        this.audio.play('explosion');
       } else if (ev.killed) {
         this.audio.play('kill');
       } else {
@@ -211,6 +215,7 @@ export class Game {
       `冷却 ${ws.cooldown} 秒`,
       `射程 ${ws.range}`,
     ];
+    if (def.explosionRadius) lines.push(`爆炸范围 ${def.explosionRadius}`);
     if (ws.critBonus > 0) lines.push(`暴击率 +${ws.critBonus}%`);
     return {
       kind: 'weapon',

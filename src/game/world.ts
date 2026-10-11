@@ -3,7 +3,7 @@ import { Rng } from '../core/rng';
 import { SpatialHash } from '../core/spatialHash';
 import { BASE_STATS } from '../data/stats';
 import { MAX_TIER, MAX_WEAPONS, MERGE_COUNT, STARTING_WEAPON, type WeaponDef } from '../data/weapons';
-import type { Enemy, FloatText, GameEvent, Pickup, Player, Projectile, SpawnMarker, WeaponSlot } from './types';
+import type { Enemy, Explosion, FloatText, GameEvent, Pickup, Player, Projectile, SpawnMarker, WeaponSlot } from './types';
 
 export const ARENA_W = 1800;
 export const ARENA_H = 1400;
@@ -21,6 +21,7 @@ export class World {
   pickups: Pickup[] = [];
   markers: SpawnMarker[] = [];
   texts: FloatText[] = [];
+  explosions: Explosion[] = [];
   /** Drained by Game after every step. */
   events: GameEvent[] = [];
 
@@ -177,7 +178,7 @@ function createProjectile(): Projectile {
   return {
     x: 0, y: 0, px: 0, py: 0, r: 0,
     vx: 0, vy: 0, life: 0, damage: 0, pierce: 0, knockback: 0,
-    crit: false, hostile: false, color: 0xffffff, hits: [],
+    crit: false, hostile: false, color: 0xffffff, explosion: 0, kind: 'bullet', hits: [],
   };
 }
 
