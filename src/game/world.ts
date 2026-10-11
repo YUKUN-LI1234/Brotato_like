@@ -3,7 +3,18 @@ import { Rng } from '../core/rng';
 import { SpatialHash } from '../core/spatialHash';
 import { BASE_STATS } from '../data/stats';
 import { MAX_TIER, MAX_WEAPONS, MERGE_COUNT, STARTING_WEAPON, type WeaponDef } from '../data/weapons';
-import type { Enemy, Explosion, FloatText, GameEvent, Pickup, Player, Projectile, SpawnMarker, WeaponSlot } from './types';
+import type {
+  Enemy,
+  Explosion,
+  FloatText,
+  GameEvent,
+  PendingBlast,
+  Pickup,
+  Player,
+  Projectile,
+  SpawnMarker,
+  WeaponSlot,
+} from './types';
 
 export const ARENA_W = 1800;
 export const ARENA_H = 1400;
@@ -22,6 +33,7 @@ export class World {
   markers: SpawnMarker[] = [];
   texts: FloatText[] = [];
   explosions: Explosion[] = [];
+  pendingBlasts: PendingBlast[] = [];
   /** Drained by Game after every step. */
   events: GameEvent[] = [];
 

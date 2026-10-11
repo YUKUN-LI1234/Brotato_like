@@ -413,6 +413,21 @@ h3 {
   font-size: 20px;
 }
 
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-chip {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #ffffff1a;
+  color: var(--muted);
+}
+
 .card-line {
   font-size: 14px;
 }

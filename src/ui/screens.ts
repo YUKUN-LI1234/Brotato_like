@@ -10,6 +10,8 @@ export interface ShopOffer {
   /** Weapon quality 1..4; items use 0. */
   tier: number;
   price: number;
+  /** Weapon class labels, e.g. "爆炸物". */
+  tags: string[];
   lines: string[];
   color: number;
   sold: boolean;
@@ -148,6 +150,11 @@ export class Screens {
     if (o.kind === 'weapon') title.style.color = cssColor(TIERS[o.tier - 1].color);
     card.prepend(swatch);
     card.append(title);
+    if (o.tags.length > 0) {
+      const tags = el('div', 'card-tags');
+      for (const tag of o.tags) tags.append(el('span', 'tag-chip', tag));
+      card.append(tags);
+    }
     for (const line of o.lines) card.append(el('div', `card-line ${line.includes('-') ? 'bad' : 'good'}`, line));
     if (o.mergeHint && !o.sold) card.append(el('div', 'merge-hint', o.mergeHint));
 

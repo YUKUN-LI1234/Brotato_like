@@ -97,6 +97,18 @@ export interface Explosion {
   life: number;
 }
 
+/** A blast waiting to go off (aftershocks from "explode chance"). */
+export interface PendingBlast {
+  x: number;
+  y: number;
+  /** Base radius/damage, before explosion stats. */
+  radius: number;
+  damage: number;
+  knockback: number;
+  crit: boolean;
+  delay: number;
+}
+
 export interface FloatText {
   x: number;
   y: number;

@@ -35,9 +35,13 @@ export function damageEnemy(
 
 const blastTargets: Enemy[] = [];
 
+/** An aftershock goes off this long after the blast that triggered it. */
+const AFTERSHOCK_DELAY = 0.16;
+
 /**
  * Area damage around (x, y). Radius and damage scale with the explosion
- * stats; enemies are pushed away from the center.
+ * stats; enemies are pushed away from the center. Only explosive weapons
+ * call this, and each blast rolls "explode chance" for one aftershock.
  */
 export function explode(
   w: World,
@@ -47,6 +51,7 @@ export function explode(
   baseDamage: number,
   knockback: number,
   crit: boolean,
+  aftershock = false,
 ): void {
   const s = w.player.stats;
   const radius = baseRadius * Math.max(0.2, 1 + s.explosionSize / 100);
@@ -62,6 +67,34 @@ export function explode(
   }
   w.explosions.push({ x, y, radius, t: 0, life: 0.35 });
   w.events.push({ type: 'explosion' });
+
+  // Aftershocks never chain, so one rocket blows up at most twice
+  if (!aftershock && w.rng.next() * 100 < s.explodeChance) {
+    const a = w.rng.range(0, Math.PI * 2);
+    const off = baseRadius * 0.45;
+    w.pendingBlasts.push({
+      x: x + Math.cos(a) * off,
+      y: y + Math.sin(a) * off,
+      radius: baseRadius * 0.75,
+      damage: baseDamage * 0.6,
+      knockback: knockback * 0.6,
+      crit,
+      delay: AFTERSHOCK_DELAY,
+    });
+  }
+}
+
+/** Detonate queued aftershocks whose delay has run out. */
+export function updateBlasts(w: World, dt: number): void {
+  if (w.pendingBlasts.length === 0) return;
+  w.rebuildEnemyHash();
+  for (let i = w.pendingBlasts.length - 1; i >= 0; i--) {
+    const b = w.pendingBlasts[i];
+    b.delay -= dt;
+    if (b.delay > 0) continue;
+    w.pendingBlasts.splice(i, 1);
+    explode(w, b.x, b.y, b.radius, b.damage, b.knockback, b.crit, true);
+  }
 }
 
 export function killEnemy(w: World, e: Enemy): void {

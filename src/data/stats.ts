@@ -19,7 +19,7 @@ export interface Stats {
   explosionSize: number;
   /** Explosion damage, % */
   explosionDamage: number;
-  /** Chance for any bullet hit to explode, % */
+  /** Chance for an explosive weapon's blast to set off an aftershock, % */
   explodeChance: number;
 }
 

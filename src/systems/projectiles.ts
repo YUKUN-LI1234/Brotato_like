@@ -50,10 +50,6 @@ function hitEnemies(w: World, pr: World['projectiles'][number]): boolean {
     }
     damageEnemy(w, e, pr.damage, pr.crit, pr.vx / speed, pr.vy / speed, pr.knockback);
     pr.hits.push(e);
-    // "Explode chance" items: any bullet hit may also blow up (half damage)
-    if (w.rng.next() * 100 < w.player.stats.explodeChance) {
-      explode(w, pr.x, pr.y, 55, pr.damage * 0.5, pr.knockback * 0.5, pr.crit);
-    }
     if (pr.pierce <= 0) return true;
     pr.pierce--;
     pr.damage = Math.max(1, Math.round(pr.damage * 0.5));

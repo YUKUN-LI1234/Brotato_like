@@ -1,7 +1,8 @@
 import { BitmapText, Container, Graphics, Sprite, type Application } from 'pixi.js';
 import type { Body } from '../game/types';
 import { ARENA_H, ARENA_W, type World } from '../game/world';
-import { BLAST_RADIUS, buildTextures, weaponKey, type TextureSet } from './textures';
+import { ExplosionFx, particleLook, type FxLayer, type Particle } from './fx';
+import { buildTextures, weaponKey, type TextureSet } from './textures';
 
 /** World units visible across the shorter screen axis. */
 const VIEW_HEIGHT = 820;
@@ -15,12 +16,14 @@ export class GameRenderer {
   private readonly camera = new Container();
   private readonly layers = {
     floor: new Container(),
+    decals: new Container(),
     markers: new Container(),
     shadows: new Container(),
     pickups: new Container(),
     enemies: new Container(),
     player: new Container(),
     projectiles: new Container(),
+    smoke: new Container(),
     effects: new Container(),
     texts: new Container(),
   };
@@ -28,11 +31,14 @@ export class GameRenderer {
   private readonly textPool: BitmapText[] = [];
   private readonly playerSprite: Sprite;
   private readonly playerShadow: Sprite;
+  private readonly fx: ExplosionFx;
+  private readonly fxByLayer: Record<FxLayer, Particle[]> = { decal: [], smoke: [], fire: [] };
   private camX = ARENA_W / 2;
   private camY = ARENA_H / 2;
 
   constructor(private readonly app: Application) {
     this.tex = buildTextures(app.renderer);
+    this.fx = new ExplosionFx(this.tex.fx);
     for (const layer of Object.values(this.layers)) this.camera.addChild(layer);
     app.stage.addChild(this.camera);
     this.layers.floor.addChild(drawArena());
@@ -55,8 +61,13 @@ export class GameRenderer {
     const zoom = Math.min(height / VIEW_HEIGHT, width / (VIEW_HEIGHT * 1.2));
     this.camX += (pp.x - this.camX) * 0.18;
     this.camY += (pp.y - this.camY) * 0.18;
+    this.fx.update(w);
+    const shake = this.fx.shakeOffset(t);
     this.camera.scale.set(zoom);
-    this.camera.position.set(width / 2 - this.camX * zoom, height / 2 - this.camY * zoom);
+    this.camera.position.set(
+      width / 2 - (this.camX + shake.x) * zoom,
+      height / 2 - (this.camY + shake.y) * zoom,
+    );
 
     // Player: squash-and-stretch while walking, blink during i-frames
     const ps = this.playerSprite;
@@ -150,17 +161,27 @@ export class GameRenderer {
       }
     });
 
-    this.sync(this.layers.effects, w.explosions, (s, ex) => {
-      const k = ex.t / ex.life;
-      s.texture = this.tex.blast;
-      s.anchor.set(0.5);
-      s.position.set(ex.x, ex.y);
-      // Fast pop out, then fade
-      s.scale.set((ex.radius / BLAST_RADIUS) * (0.55 + 0.45 * Math.sqrt(k)));
-      s.alpha = 1 - k * k;
-    });
+    for (const list of Object.values(this.fxByLayer)) list.length = 0;
+    for (const p of this.fx.particles) this.fxByLayer[p.layer].push(p);
+    this.syncParticles(this.layers.decals, this.fxByLayer.decal);
+    this.syncParticles(this.layers.smoke, this.fxByLayer.smoke);
+    this.syncParticles(this.layers.effects, this.fxByLayer.fire);
 
     this.syncTexts(w);
+  }
+
+  private syncParticles(layer: Container, items: readonly Particle[]): void {
+    this.sync(layer, items, (s, p) => {
+      const look = particleLook(p);
+      s.texture = p.tex;
+      s.anchor.set(0.5);
+      s.position.set(p.x, p.y);
+      s.rotation = p.rot;
+      s.scale.set(look.sx, look.sy);
+      s.alpha = look.alpha;
+      s.tint = look.tint;
+      s.blendMode = p.additive ? 'add' : 'normal';
+    });
   }
 
   /**

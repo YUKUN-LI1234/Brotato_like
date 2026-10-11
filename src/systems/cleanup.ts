@@ -27,4 +27,5 @@ export function clearWave(w: World): void {
   w.markers.length = 0;
   w.texts.length = 0;
   w.explosions.length = 0;
+  w.pendingBlasts.length = 0;
 }

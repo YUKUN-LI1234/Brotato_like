@@ -7,10 +7,19 @@ import { ITEMS } from '../data/items';
 import { addStats, formatStatMod, STAT_ORDER } from '../data/stats';
 import { UPGRADES, type Upgrade } from '../data/upgrades';
 import { MAX_WAVE, priceForWave, rerollCost, waveConfig } from '../data/waves';
-import { MAX_TIER, MERGE_COUNT, rollShopTier, tierOf, weaponStats, WEAPONS, type WeaponDef } from '../data/weapons';
+import {
+  MAX_TIER,
+  MERGE_COUNT,
+  rollShopTier,
+  TAG_LABELS,
+  tierOf,
+  weaponStats,
+  WEAPONS,
+  type WeaponDef,
+} from '../data/weapons';
 import { GameRenderer } from '../render/renderer';
 import { cleanup, clearWave } from '../systems/cleanup';
-import { collectMaterial, gainXp } from '../systems/combat';
+import { collectMaterial, gainXp, updateBlasts } from '../systems/combat';
 import { updateEnemies } from '../systems/enemies';
 import { collectAllPickups, updatePickups } from '../systems/pickups';
 import { updatePlayer } from '../systems/player';
@@ -114,6 +123,7 @@ export class Game {
     updateEnemies(w, dt);
     updateWeapons(w, dt);
     updateProjectiles(w, dt);
+    updateBlasts(w, dt);
     updatePickups(w, dt);
     cleanup(w, dt);
     this.playEvents(w.events);
@@ -230,6 +240,7 @@ export class Game {
           name: item.name,
           price: priceForWave(item.price, w.wave),
           tier: 0,
+          tags: [],
           lines: STAT_ORDER.filter((k) => item.mods[k]).map((k) => formatStatMod(k, item.mods[k]!)),
           color: item.color,
           sold: false,
@@ -257,6 +268,7 @@ export class Game {
       name: def.name,
       tier,
       price: priceForWave(def.price * tierOf(tier).price, this.world.wave),
+      tags: def.tags.map((t) => TAG_LABELS[t]),
       lines,
       color: def.color,
       sold: false,

@@ -1,4 +1,13 @@
 /** Weapon definitions. Pure data: systems read these, nothing mutates them. */
+
+/** Weapon class tags. Some stats only apply to weapons with a given tag. */
+export type WeaponTag = 'projectile' | 'explosive';
+
+export const TAG_LABELS: Record<WeaponTag, string> = {
+  projectile: '投射物',
+  explosive: '爆炸物',
+};
+
 export interface WeaponDef {
   id: string;
   name: string;
@@ -21,6 +30,7 @@ export interface WeaponDef {
   style: 'gun' | 'tube' | 'gatling';
   /** Projectile look. */
   projectile: 'bullet' | 'rocket';
+  tags: readonly WeaponTag[];
   /** If set, the shot explodes on impact/at max range with this base radius. */
   explosionRadius?: number;
 }
@@ -43,6 +53,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     length: 22,
     style: 'gun',
     projectile: 'bullet',
+    tags: ['projectile'],
   },
   smg: {
     id: 'smg',
@@ -61,6 +72,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     length: 26,
     style: 'gun',
     projectile: 'bullet',
+    tags: ['projectile'],
   },
   shotgun: {
     id: 'shotgun',
@@ -79,6 +91,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     length: 28,
     style: 'gun',
     projectile: 'bullet',
+    tags: ['projectile'],
   },
   rifle: {
     id: 'rifle',
@@ -97,6 +110,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     length: 34,
     style: 'gun',
     projectile: 'bullet',
+    tags: ['projectile'],
   },
   rocket: {
     id: 'rocket',
@@ -116,6 +130,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     length: 38,
     style: 'tube',
     projectile: 'rocket',
+    tags: ['explosive'],
     explosionRadius: 90,
   },
   gatling: {
@@ -135,8 +150,13 @@ export const WEAPONS: Record<string, WeaponDef> = {
     length: 34,
     style: 'gatling',
     projectile: 'bullet',
+    tags: ['projectile'],
   },
 };
+
+export function hasTag(def: WeaponDef, tag: WeaponTag): boolean {
+  return def.tags.includes(tag);
+}
 
 export const STARTING_WEAPON = WEAPONS.pistol;
 export const MAX_WEAPONS = 6;

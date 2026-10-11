@@ -20,14 +20,29 @@ export interface TextureSet {
   weapons: Record<string, Anchored>;
   bullet: Texture;
   rocket: Texture;
-  blast: Texture;
+  fx: FxTextures;
   shadow: Texture;
   material: Texture;
   marker: Texture;
 }
 
+/** Explosion pieces; all are white/grey so the renderer can tint them. */
+export interface FxTextures {
+  /** Soft round glow, used for the flash and fireballs. */
+  glow: Texture;
+  /** Thin shockwave ring. */
+  ring: Texture;
+  /** Stretched streak pointing right, for sparks. */
+  spark: Texture;
+  /** Lumpy soft puff. */
+  smoke: Texture;
+  /** Dark burn mark left on the floor. */
+  scorch: Texture;
+}
+
 const OUTLINE = 0x1b1a22;
-export const BLAST_RADIUS = 64;
+/** Radius every FX texture is drawn at; the renderer scales from this. */
+export const FX_RADIUS = 64;
 
 export function buildTextures(renderer: Renderer): TextureSet {
   const bake = (g: Graphics) => {
@@ -57,7 +72,13 @@ export function buildTextures(renderer: Renderer): TextureSet {
     weapons,
     bullet: bake(new Graphics().circle(0, 0, 8).fill(0xffffff)),
     rocket: bake(drawRocket()),
-    blast: bake(drawBlast()),
+    fx: {
+      glow: bake(softCircle(FX_RADIUS, 0xffffff, 14, 0.12)),
+      ring: bake(drawRing()),
+      spark: bake(new Graphics().ellipse(0, 0, 14, 2.5).fill(0xffffff).ellipse(4, 0, 6, 1.5).fill(0xffffff)),
+      smoke: bake(drawSmoke()),
+      scorch: bake(drawScorch()),
+    },
     shadow: bake(new Graphics().ellipse(0, 0, 20, 7).fill({ color: 0x000000, alpha: 0.28 })),
     material: bake(
       new Graphics()
@@ -316,14 +337,44 @@ function drawRocket(): Graphics {
   return g;
 }
 
-/** Explosion flash; the renderer scales and fades it. */
-function drawBlast(): Graphics {
+/** Stacked translucent discs: dense in the middle, fading to the edge. */
+function softCircle(r: number, color: number, steps: number, alpha: number, g = new Graphics(), x = 0, y = 0): Graphics {
+  for (let i = 0; i < steps; i++) {
+    g.circle(x, y, r * (1 - i / steps)).fill({ color, alpha });
+  }
+  return g;
+}
+
+function drawRing(): Graphics {
   const g = new Graphics();
-  const R = BLAST_RADIUS;
-  g.circle(0, 0, R).fill({ color: 0xff7a2a, alpha: 0.35 });
-  g.circle(0, 0, R * 0.72).fill({ color: 0xffa23a, alpha: 0.55 });
-  g.circle(0, 0, R * 0.42).fill({ color: 0xfff0a0, alpha: 0.85 });
-  g.circle(0, 0, R - 3).stroke({ width: 6, color: 0xffd36b });
+  const R = FX_RADIUS;
+  g.circle(0, 0, R - 4).stroke({ width: 8, color: 0xffffff, alpha: 0.35 });
+  g.circle(0, 0, R - 4).stroke({ width: 3, color: 0xffffff });
+  return g;
+}
+
+/** A few overlapping soft blobs, so the puff isn't a perfect circle. */
+function drawSmoke(): Graphics {
+  const g = new Graphics();
+  const R = FX_RADIUS;
+  softCircle(R * 0.7, 0xffffff, 8, 0.1, g, -R * 0.2, R * 0.08);
+  softCircle(R * 0.6, 0xffffff, 8, 0.1, g, R * 0.25, R * 0.15);
+  softCircle(R * 0.65, 0xffffff, 8, 0.1, g, R * 0.05, -R * 0.22);
+  return g;
+}
+
+function drawScorch(): Graphics {
+  const g = new Graphics();
+  const R = FX_RADIUS;
+  softCircle(R, 0x140c08, 10, 0.09, g);
+  // Ragged burn streaks radiating out
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + (i % 2) * 0.3;
+    const len = R * (0.75 + (i % 3) * 0.08);
+    g.moveTo(Math.cos(a) * R * 0.3, Math.sin(a) * R * 0.3)
+      .lineTo(Math.cos(a) * len, Math.sin(a) * len)
+      .stroke({ width: 5, color: 0x140c08, alpha: 0.18, cap: 'round' });
+  }
   return g;
 }
 
