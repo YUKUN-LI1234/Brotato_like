@@ -19,9 +19,11 @@ import { spawnEnemy, updateSpawns } from '../systems/spawn';
 import { updateWeapons } from '../systems/weapons';
 import { Hud } from '../ui/hud';
 import { Screens, type ShopOffer } from '../ui/screens';
+import { VolumeControl } from '../ui/volume';
 import { ENEMIES } from '../data/enemies';
 import type { GameEvent } from './types';
-import { addWeapon, ARENA_H, ARENA_W, canAcquire, maxHpOf, mergeProgress, World, type MergeResult } from './world';
+import type { WeaponSlot } from './types';
+import { addWeapon, ARENA_H, ARENA_W, canAcquire, maxHpOf, mergeProgress, removeWeapon, World, type MergeResult } from './world';
 
 export type GameState = 'menu' | 'wave' | 'levelup' | 'shop' | 'gameover';
 
@@ -44,6 +46,7 @@ export class Game {
   private readonly renderer: GameRenderer;
   private readonly hud: Hud;
   private readonly screens: Screens;
+  private readonly volume: VolumeControl;
   private readonly loop: FixedLoop;
   private offers: ShopOffer[] = [];
   private rerolls = 0;
@@ -55,8 +58,7 @@ export class Game {
     this.hud = new Hud(uiRoot);
     this.screens = new Screens(uiRoot);
     this.loop = new FixedLoop(STEP, (dt) => this.update(dt), (a) => this.render(a));
-    this.hud.onToggleMute(() => this.toggleMute());
-    this.hud.setMuted(this.audio.muted);
+    this.volume = new VolumeControl(uiRoot, this.audio);
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyM') this.toggleMute();
     });
@@ -125,7 +127,8 @@ export class Game {
   }
 
   private toggleMute(): void {
-    this.hud.setMuted(this.audio.toggleMute());
+    this.audio.toggleMute();
+    this.volume.refresh();
   }
 
   private render(alpha: number): void {
@@ -192,7 +195,8 @@ export class Game {
           lines: STAT_ORDER.filter((k) => item.mods[k]).map((k) => formatStatMod(k, item.mods[k]!)),
           color: item.color,
           sold: false,
-          fits: true,
+          canBuy: true,
+          needsRecycle: false,
           mergeHint: null,
         });
       }
@@ -217,7 +221,8 @@ export class Game {
       lines,
       color: def.color,
       sold: false,
-      fits: true,
+      canBuy: true,
+      needsRecycle: false,
       mergeHint: null,
     };
   }
@@ -225,10 +230,13 @@ export class Game {
   /** Recompute per-offer merge info against the current loadout. */
   private refreshOffers(): void {
     const p = this.world.player;
+    const bestRefund = Math.max(0, ...p.weapons.map((s) => this.recycleValue(s)));
     for (const o of this.offers) {
+      o.canBuy = o.price <= p.materials;
       if (o.kind !== 'weapon') continue;
       const def = WEAPONS[o.id];
-      o.fits = canAcquire(p, def, o.tier);
+      o.needsRecycle = !canAcquire(p, def, o.tier);
+      if (o.needsRecycle) o.canBuy = o.price <= p.materials + bestRefund;
       const owned = mergeProgress(p, def, o.tier);
       o.mergeHint =
         o.tier >= MAX_TIER || owned === 0
@@ -264,15 +272,23 @@ export class Game {
     );
   }
 
+  /** Recycling returns 1/3 of the weapon's current shop price. */
+  private recycleValue(slot: WeaponSlot): number {
+    return Math.max(1, Math.floor(priceForWave(slot.def.price * tierOf(slot.tier).price, this.world.wave) / 3));
+  }
+
   private buy(i: number): void {
     const p = this.world.player;
     const offer = this.offers[i];
-    if (!offer || offer.sold || offer.price > p.materials) return;
+    if (!offer || offer.sold) return;
+    if (offer.kind === 'weapon' && !canAcquire(p, WEAPONS[offer.id], offer.tier)) {
+      this.askRecycle(i);
+      return;
+    }
+    if (offer.price > p.materials) return;
     this.notices = [];
     if (offer.kind === 'weapon') {
-      const def = WEAPONS[offer.id];
-      if (!canAcquire(p, def, offer.tier)) return;
-      this.announceMerges(addWeapon(p, def, offer.tier));
+      this.announceMerges(addWeapon(p, WEAPONS[offer.id], offer.tier));
     } else {
       const item = ITEMS.find((it) => it.id === offer.id)!;
       addStats(p.stats, item.mods);
@@ -281,6 +297,39 @@ export class Game {
     }
     p.materials -= offer.price;
     offer.sold = true;
+    this.openShop();
+  }
+
+  private askRecycle(offerIndex: number): void {
+    const p = this.world.player;
+    const offer = this.offers[offerIndex];
+    this.screens.recycleDialog(
+      {
+        offer,
+        materials: p.materials,
+        options: p.weapons.map((s) => {
+          const refund = this.recycleValue(s);
+          return { name: s.def.name, tier: s.tier, refund, disabled: p.materials + refund < offer.price };
+        }),
+      },
+      (slotIndex) => this.recycleAndBuy(offerIndex, slotIndex),
+      () => this.openShop(),
+    );
+  }
+
+  private recycleAndBuy(offerIndex: number, slotIndex: number): void {
+    const p = this.world.player;
+    const offer = this.offers[offerIndex];
+    const slot = p.weapons[slotIndex];
+    if (!offer || offer.sold || !slot) return;
+    const refund = this.recycleValue(slot);
+    if (p.materials + refund < offer.price) return;
+
+    removeWeapon(p, slotIndex);
+    p.materials += refund - offer.price;
+    offer.sold = true;
+    this.notices = [`回收 ${tierOf(slot.tier).name}${slot.def.name}，返还 ${refund} 材料`];
+    this.announceMerges(addWeapon(p, WEAPONS[offer.id], offer.tier));
     this.openShop();
   }
 

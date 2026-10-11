@@ -1,7 +1,20 @@
 import { Music, type MusicMode } from './music';
 import { renderSfx, type SfxName } from './sfx';
 
-const MUTE_KEY = 'brotato_like.muted';
+const SETTINGS_KEY = 'brotato_like.audio';
+
+/** Full-scale bus gains; the user's sliders scale these. */
+const MUSIC_GAIN = 0.45;
+const SFX_GAIN = 0.7;
+const MASTER_GAIN = 0.8;
+
+export type VolumeKind = 'music' | 'sfx';
+
+export interface AudioSettings {
+  music: number;
+  sfx: number;
+  muted: boolean;
+}
 const MAX_VOICES = 24;
 
 /** Minimum seconds between two plays of the same sound, to avoid a wall of noise. */
@@ -23,12 +36,17 @@ export class AudioEngine {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private sfxBus!: GainNode;
+  private musicBus!: GainNode;
   private buffers!: Record<SfxName, AudioBuffer>;
   private music!: Music;
   private readonly lastPlayed = new Map<SfxName, number>();
   private voices = 0;
   private pendingMode: MusicMode = 'off';
-  muted = readMuted();
+  readonly settings: AudioSettings = readSettings();
+
+  get muted(): boolean {
+    return this.settings.muted;
+  }
 
   unlock(): void {
     if (this.ctx) {
@@ -46,16 +64,17 @@ export class AudioEngine {
     comp.ratio.value = 6;
     comp.connect(ctx.destination);
     this.master = ctx.createGain();
-    this.master.gain.value = this.muted ? 0 : 0.8;
+    this.master.gain.value = this.muted ? 0 : MASTER_GAIN;
     this.master.connect(comp);
 
     this.sfxBus = ctx.createGain();
-    this.sfxBus.gain.value = 0.7;
+    this.sfxBus.gain.value = SFX_GAIN * this.settings.sfx;
     this.sfxBus.connect(this.master);
 
     const musicBus = ctx.createGain();
-    musicBus.gain.value = 0.45;
+    musicBus.gain.value = MUSIC_GAIN * this.settings.music;
     musicBus.connect(this.master);
+    this.musicBus = musicBus;
 
     this.buffers = renderSfx(ctx);
     this.music = new Music(ctx, musicBus);
@@ -90,22 +109,43 @@ export class AudioEngine {
     this.music?.setMode(mode);
   }
 
-  toggleMute(): boolean {
-    this.muted = !this.muted;
-    try {
-      localStorage.setItem(MUTE_KEY, this.muted ? '1' : '0');
-    } catch {
-      /* storage unavailable: mute just won't persist */
+  /** `value` in 0..1. */
+  setVolume(kind: VolumeKind, value: number): void {
+    const v = Math.min(1, Math.max(0, value));
+    this.settings[kind] = v;
+    if (this.ctx) {
+      const bus = kind === 'music' ? this.musicBus : this.sfxBus;
+      bus.gain.setTargetAtTime((kind === 'music' ? MUSIC_GAIN : SFX_GAIN) * v, this.ctx.currentTime, 0.03);
     }
-    if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.8, this.ctx.currentTime, 0.05);
+    this.save();
+  }
+
+  toggleMute(): boolean {
+    this.settings.muted = !this.settings.muted;
+    if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : MASTER_GAIN, this.ctx.currentTime, 0.05);
+    this.save();
     return this.muted;
+  }
+
+  private save(): void {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+    } catch {
+      /* storage unavailable: settings just won't persist */
+    }
   }
 }
 
-function readMuted(): boolean {
+function readSettings(): AudioSettings {
+  const defaults: AudioSettings = { music: 0.7, sfx: 0.8, muted: false };
   try {
-    return localStorage.getItem(MUTE_KEY) === '1';
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<AudioSettings>;
+    return {
+      music: typeof raw.music === 'number' ? raw.music : defaults.music,
+      sfx: typeof raw.sfx === 'number' ? raw.sfx : defaults.sfx,
+      muted: typeof raw.muted === 'boolean' ? raw.muted : defaults.muted,
+    };
   } catch {
-    return false;
+    return defaults;
   }
 }

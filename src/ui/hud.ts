@@ -12,7 +12,6 @@ export class Hud {
   private readonly wave: HTMLElement;
   private readonly timer: HTMLElement;
   private readonly cache = new Map<HTMLElement, string>();
-  private readonly muteBtn: HTMLButtonElement;
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'hud');
@@ -25,8 +24,7 @@ export class Hud {
       <div class="hud-center">
         <div class="wave"></div>
         <div class="timer"></div>
-      </div>
-      <button class="mute" title="静音 (M)"></button>`;
+      </div>`;
     parent.appendChild(this.root);
     const q = (s: string) => this.root.querySelector(s) as HTMLElement;
     this.hpFill = q('.hp .fill');
@@ -36,19 +34,6 @@ export class Hud {
     this.materials = q('.materials span');
     this.wave = q('.wave');
     this.timer = q('.timer');
-    this.muteBtn = q('.mute') as HTMLButtonElement;
-  }
-
-  onToggleMute(handler: () => void): void {
-    this.muteBtn.addEventListener('click', () => {
-      handler();
-      this.muteBtn.blur();
-    });
-  }
-
-  setMuted(muted: boolean): void {
-    this.muteBtn.textContent = muted ? '声音：关 (M)' : '声音：开 (M)';
-    this.muteBtn.classList.toggle('off', muted);
   }
 
   show(visible: boolean): void {

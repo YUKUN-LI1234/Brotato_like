@@ -13,8 +13,10 @@ export interface ShopOffer {
   lines: string[];
   color: number;
   sold: boolean;
-  /** Weapon only: false when all slots are full and it would not merge. */
-  fits: boolean;
+  /** Affordable right now (counting the best recycle refund when needed). */
+  canBuy: boolean;
+  /** Weapon only: slots are full and it won't merge, so one must be recycled. */
+  needsRecycle: boolean;
   /** e.g. "购买后合成：稀有" — shown as a badge on the card. */
   mergeHint: string | null;
 }
@@ -33,6 +35,20 @@ export interface ShopView {
   stats: Stats;
   /** Messages from merges that just happened. */
   notices: string[];
+}
+
+export interface RecycleOption {
+  name: string;
+  tier: number;
+  refund: number;
+  /** Not enough materials even with this refund. */
+  disabled: boolean;
+}
+
+export interface RecycleView {
+  offer: ShopOffer;
+  materials: number;
+  options: RecycleOption[];
 }
 
 export const cssColor = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -101,7 +117,7 @@ export class Screens {
 
     const body = el('div', 'shop-body');
     const row = el('div', 'cards');
-    view.offers.forEach((o, i) => row.append(this.offerCard(o, view.materials, () => onBuy(i))));
+    view.offers.forEach((o, i) => row.append(this.offerCard(o, () => onBuy(i))));
     body.append(row);
     body.append(this.sidePanel(view));
     panel.append(body);
@@ -117,7 +133,7 @@ export class Screens {
     next.focus();
   }
 
-  private offerCard(o: ShopOffer, materials: number, onBuy: () => void): HTMLButtonElement {
+  private offerCard(o: ShopOffer, onBuy: () => void): HTMLButtonElement {
     const card = el('button', `card ${o.kind}`);
     if (o.kind === 'weapon') {
       const tier = TIERS[o.tier - 1];
@@ -135,9 +151,10 @@ export class Screens {
     for (const line of o.lines) card.append(el('div', `card-line ${line.includes('-') ? 'bad' : 'good'}`, line));
     if (o.mergeHint && !o.sold) card.append(el('div', 'merge-hint', o.mergeHint));
 
-    const blocked = o.sold || o.price > materials || (o.kind === 'weapon' && !o.fits);
-    const priceText = o.sold ? '已售出' : o.kind === 'weapon' && !o.fits ? '武器栏已满' : `${o.price}`;
-    card.append(el('div', 'price', priceText));
+    if (o.needsRecycle && !o.sold) card.append(el('div', 'recycle-hint', '武器栏已满 · 需回收一把'));
+
+    const blocked = o.sold || !o.canBuy;
+    card.append(el('div', 'price', o.sold ? '已售出' : `${o.price}`));
     card.disabled = blocked;
     if (!blocked) card.addEventListener('click', onBuy);
     return card;
@@ -160,6 +177,52 @@ export class Screens {
     }
     side.append(list);
     return side;
+  }
+
+  /**
+   * Modal over the shop: pick which owned weapon to recycle for 1/3 of its
+   * price so the new one fits. Escape or "取消" closes it.
+   */
+  recycleDialog(view: RecycleView, onPick: (i: number) => void, onCancel: () => void): void {
+    const backdrop = el('div', 'modal-backdrop');
+    const modal = el('div', 'panel modal');
+    const t = TIERS[view.offer.tier - 1];
+    const title = el('h2', '', '武器栏已满');
+    const sub = el('p', 'sub');
+    sub.append('选择一把武器回收（按当前价格的 1/3 返还材料），以购买 ');
+    const name = el('b', '', `${t.name}${view.offer.name}`);
+    name.style.color = cssColor(t.color);
+    sub.append(name, `（${view.offer.price}）。当前材料：${view.materials}`);
+    modal.append(title, sub);
+
+    const list = el('div', 'recycle-list');
+    view.options.forEach((o, i) => {
+      const tier = TIERS[o.tier - 1];
+      const row = el('button', 'recycle-row');
+      row.style.borderColor = cssColor(tier.color);
+      const label = el('span', 'recycle-name', `${o.name} · ${tier.name}`);
+      label.style.color = cssColor(tier.color);
+      row.append(label, el('span', 'recycle-refund', `+${o.refund}`));
+      row.disabled = o.disabled;
+      if (!o.disabled) row.addEventListener('click', () => onPick(i));
+      list.append(row);
+    });
+    modal.append(list);
+
+    const cancel = button('取消', onCancel);
+    const footer = el('div', 'shop-footer');
+    footer.append(cancel);
+    modal.append(footer);
+    backdrop.append(modal);
+    this.root.append(backdrop);
+    cancel.focus();
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Escape') onCancel();
+      },
+      { signal: this.keys.signal },
+    );
   }
 
   /** Number keys 1..n pick the matching card while this overlay is open. */

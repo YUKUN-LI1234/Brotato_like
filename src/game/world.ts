@@ -132,6 +132,13 @@ export function canAcquire(player: Player, def: WeaponDef, tier: number): boolea
   return same >= MERGE_COUNT - 1;
 }
 
+/** Remove the weapon at `index` (recycling). */
+export function removeWeapon(player: Player, index: number): WeaponSlot | null {
+  const [slot] = player.weapons.splice(index, 1);
+  layoutWeapons(player);
+  return slot ?? null;
+}
+
 /** How many more copies of this weapon/tier would trigger a merge (0 = not close). */
 export function mergeProgress(player: Player, def: WeaponDef, tier: number): number {
   if (tier >= MAX_TIER) return 0;

@@ -21,8 +21,9 @@ Controls: **WASD / arrow keys** to move, **1–4** to pick a level-up, **Enter**
 - 4 enemy types (chaser, fast runner, tank, ranged spitter)
 - 4 weapons with auto-aim, crits, pierce, spread and knockback; up to 6 at once
 - Weapon tiers: Common (white) → Rare (blue) → Epic (purple) → Legendary (red). Three of the same weapon and tier merge into one of the next tier automatically (chain merges included); each tier steps up damage, fire rate, range, knockback and crit. Higher tiers show up in the shop in later waves
+- Full weapon slots: buying a weapon that won't merge opens a dialog to recycle one owned weapon for 1/3 of its current price
 - Chinese UI (简体中文)
-- Procedural music and sound effects (Web Audio, no audio files)
+- Procedural music and sound effects (Web Audio, no audio files), with music/SFX volume sliders and mute (saved)
 - 12 stats (HP, regen, armor, dodge, damage, attack speed, crit, range, harvesting, …)
 - XP and level-ups, materials, shop with items, weapons and rerolls
 - Best wave saved in `localStorage`
