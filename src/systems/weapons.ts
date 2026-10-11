@@ -41,6 +41,7 @@ function fireWeapon(w: World, slot: WeaponSlot, x: number, y: number, range: num
   const def = slot.def;
   const s = w.player.stats;
   const n = def.projectiles;
+  w.events.push({ type: 'fire', weapon: def.id });
   // Start the shot at the muzzle, not the grip
   const mx = x + Math.cos(slot.angle) * def.length;
   const my = y + Math.sin(slot.angle) * def.length;

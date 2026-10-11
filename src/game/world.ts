@@ -3,7 +3,7 @@ import { Rng } from '../core/rng';
 import { SpatialHash } from '../core/spatialHash';
 import { BASE_STATS } from '../data/stats';
 import { STARTING_WEAPON, type WeaponDef } from '../data/weapons';
-import type { Enemy, FloatText, Pickup, Player, Projectile, SpawnMarker, WeaponSlot } from './types';
+import type { Enemy, FloatText, GameEvent, Pickup, Player, Projectile, SpawnMarker, WeaponSlot } from './types';
 
 export const ARENA_W = 1800;
 export const ARENA_H = 1400;
@@ -21,6 +21,8 @@ export class World {
   pickups: Pickup[] = [];
   markers: SpawnMarker[] = [];
   texts: FloatText[] = [];
+  /** Drained by Game after every step. */
+  events: GameEvent[] = [];
 
   readonly enemyHash = new SpatialHash<Enemy>(64);
   readonly enemyPool = new Pool<Enemy>(createEnemy);

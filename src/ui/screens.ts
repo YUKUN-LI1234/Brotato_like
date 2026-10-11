@@ -57,7 +57,7 @@ export class Screens {
     );
     if (bestWave > 0) panel.append(el('p', 'best', `Best: wave ${bestWave}`));
     const start = button('Start', onStart, 'primary');
-    panel.append(start, el('p', 'hint', 'WASD / Arrow keys to move · Enter to start'));
+    panel.append(start, el('p', 'hint', 'WASD / Arrow keys to move · M to mute · Enter to start'));
     this.open(panel);
     start.focus();
   }

@@ -55,6 +55,7 @@ The game instance is exposed as `__game` in the browser console:
 __game.debug.spawn(200)          // spawn enemies ('blob' | 'runner' | 'brute' | 'spitter')
 __game.debug.god()               // invincible
 __game.debug.give(100)           // materials
+__game.debug.weapon('shotgun')   // 'pistol' | 'smg' | 'shotgun' | 'rifle'
 __game.debug.skipWave()
 ```
 

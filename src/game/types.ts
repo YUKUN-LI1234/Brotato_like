@@ -92,3 +92,11 @@ export interface FloatText {
   t: number;
   scale: number;
 }
+
+/**
+ * Things that happened during a simulation step. Systems push events; the
+ * game drains them for audio (and later VFX) so systems stay side-effect free.
+ */
+export type GameEvent =
+  | { type: 'fire'; weapon: string }
+  | { type: 'enemyHit'; crit: boolean; killed: boolean };

@@ -28,7 +28,9 @@ export function damageEnemy(
   e.kbx += dirX * kb;
   e.kby += dirY * kb;
   addText(w, e.x, e.y - e.r, String(Math.round(amount)), crit ? 0xffd84a : 0xffffff, crit ? 1.35 : 1);
-  if (e.hp <= 0) killEnemy(w, e);
+  const killed = e.hp <= 0;
+  w.events.push({ type: 'enemyHit', crit, killed });
+  if (killed) killEnemy(w, e);
 }
 
 export function killEnemy(w: World, e: Enemy): void {

@@ -1,4 +1,6 @@
 import type { Application } from 'pixi.js';
+import { AudioEngine } from '../audio/audio';
+import type { SfxName } from '../audio/sfx';
 import { Input } from '../core/input';
 import { FixedLoop } from '../core/loop';
 import { ITEMS } from '../data/items';
@@ -18,6 +20,7 @@ import { updateWeapons } from '../systems/weapons';
 import { Hud } from '../ui/hud';
 import { Screens, type ShopOffer } from '../ui/screens';
 import { ENEMIES } from '../data/enemies';
+import type { GameEvent } from './types';
 import { addWeapon, ARENA_H, ARENA_W, maxHpOf, World } from './world';
 
 export type GameState = 'menu' | 'wave' | 'levelup' | 'shop' | 'gameover';
@@ -25,11 +28,19 @@ export type GameState = 'menu' | 'wave' | 'levelup' | 'shop' | 'gameover';
 const STEP = 1 / 60;
 const BEST_KEY = 'brotato_like.bestWave';
 
+const FIRE_SOUND: Record<string, SfxName> = {
+  pistol: 'fire_pistol',
+  smg: 'fire_smg',
+  shotgun: 'fire_shotgun',
+  rifle: 'fire_rifle',
+};
+
 /** Owns the loop and moves between states: menu → wave → level-up → shop → wave … */
 export class Game {
   state: GameState = 'menu';
   world: World;
   private readonly input = new Input();
+  readonly audio = new AudioEngine();
   private readonly renderer: GameRenderer;
   private readonly hud: Hud;
   private readonly screens: Screens;
@@ -43,11 +54,18 @@ export class Game {
     this.hud = new Hud(uiRoot);
     this.screens = new Screens(uiRoot);
     this.loop = new FixedLoop(STEP, (dt) => this.update(dt), (a) => this.render(a));
+    this.hud.onToggleMute(() => this.toggleMute());
+    this.hud.setMuted(this.audio.muted);
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyM') this.toggleMute();
+    });
     this.showMenu();
     this.loop.start();
   }
 
   newRun(seed = Date.now() >>> 0): void {
+    // Called from a click/keypress, so the browser lets audio start here
+    this.audio.unlock();
     this.world = new World(seed);
     this.startWave();
   }
@@ -66,6 +84,7 @@ export class Game {
     p.iframes = 0;
     for (const slot of p.weapons) slot.cooldown = 0;
     this.state = 'wave';
+    this.audio.setMusic('wave');
     this.screens.hide();
     this.hud.show(true);
   }
@@ -84,9 +103,28 @@ export class Game {
     updateProjectiles(w, dt);
     updatePickups(w, dt);
     cleanup(w, dt);
+    this.playEvents(w.events);
+    w.events.length = 0;
 
     if (w.playerDead) this.endRun(false);
     else if (w.waveTime >= w.waveDuration) this.endWave();
+  }
+
+  private playEvents(events: readonly GameEvent[]): void {
+    for (const ev of events) {
+      if (ev.type === 'fire') {
+        const name = FIRE_SOUND[ev.weapon];
+        if (name) this.audio.play(name);
+      } else if (ev.killed) {
+        this.audio.play('kill');
+      } else {
+        this.audio.play(ev.crit ? 'hit_crit' : 'hit');
+      }
+    }
+  }
+
+  private toggleMute(): void {
+    this.hud.setMuted(this.audio.toggleMute());
   }
 
   private render(alpha: number): void {
@@ -112,6 +150,7 @@ export class Game {
 
   /** Spend pending level-ups one at a time, then open the shop. */
   private nextAfterWave(): void {
+    this.audio.setMusic('calm');
     const p = this.world.player;
     if (p.pendingLevels > 0) {
       this.state = 'levelup';
@@ -220,6 +259,7 @@ export class Game {
 
   private endRun(won: boolean): void {
     this.state = 'gameover';
+    this.audio.setMusic('calm');
     this.saveBest(won ? MAX_WAVE : this.world.wave - 1);
     this.screens.gameOver(won, this.world.wave, this.world.kills, () => this.newRun());
   }
@@ -261,6 +301,10 @@ export class Game {
       this.world.player.materials += materials;
     },
     xp: (amount: number) => gainXp(this.world, amount),
+    weapon: (id: string) => {
+      const def = WEAPONS[id];
+      if (def && this.world.player.weapons.length < MAX_WEAPONS) addWeapon(this.world.player, def);
+    },
     skipWave: () => {
       if (this.state === 'wave') this.world.waveTime = this.world.waveDuration;
     },
